@@ -1,6 +1,6 @@
 # 研究タイマー
 
-研究時間を記録・可視化するWebアプリです。
+研究時間を記録・可視化するWebアプリです。Supabaseによるクラウド同期に対応しており、複数デバイスから同じ記録にアクセスできます。
 
 ## 機能
 
@@ -9,17 +9,35 @@
 - **今日の合計**: 当日の研究時間をリアルタイム表示
 - **日別グラフ**: 過去7日間の研究時間を棒グラフで可視化（Recharts）
 - **セッション履歴**: 直近10件のセッションを一覧表示
-- データはブラウザの `localStorage` に保存されます
+- **クラウド同期**: Supabase Authによるログイン＋クロスデバイス同期
+- **ローカル移行**: 既存のlocalStorageデータをSupabaseへワンクリック移行
 
 ---
 
 ## ローカル起動方法
 
-```bash
-# 依存パッケージのインストール（初回のみ）
-npm install
+### 1. 依存パッケージのインストール
 
-# 開発サーバー起動
+```bash
+npm install
+```
+
+### 2. 環境変数の設定
+
+`.env.example` をコピーして `.env` を作成し、Supabaseの値を入力します：
+
+```bash
+cp .env.example .env
+```
+
+```env
+VITE_SUPABASE_URL=https://xxxxxxxxxxxxxxxxxxx.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+### 3. 開発サーバー起動
+
+```bash
 npm run dev
 ```
 
@@ -34,26 +52,76 @@ npm run preview  # ビルド済みファイルをローカルでプレビュー
 
 ---
 
+## Supabase設定手順
+
+### 1. プロジェクト作成
+
+[https://supabase.com](https://supabase.com) でアカウントを作成し、新しいプロジェクトを作成します。
+
+### 2. sessionsテーブルの作成
+
+Supabaseダッシュボードの **SQL Editor** で以下を実行します：
+
+```sql
+create table sessions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade not null,
+  date text not null,
+  started_at timestamptz not null,
+  duration integer not null,
+  mode text not null,
+  created_at timestamptz default now()
+);
+
+alter table sessions enable row level security;
+
+create policy "Users can read own sessions"
+  on sessions for select
+  using (auth.uid() = user_id);
+
+create policy "Users can insert own sessions"
+  on sessions for insert
+  with check (auth.uid() = user_id);
+
+create policy "Users can delete own sessions"
+  on sessions for delete
+  using (auth.uid() = user_id);
+```
+
+### 3. APIキーの取得
+
+ダッシュボードの **Settings → API** から以下を取得します：
+- **Project URL** → `VITE_SUPABASE_URL`
+- **anon (public) key** → `VITE_SUPABASE_ANON_KEY`
+
+---
+
 ## GitHubへのpush方法
 
-1. [GitHub](https://github.com/new) で新しいリポジトリを作成（空のまま・READMEなし）
-
-2. ローカルリポジトリをリモートに接続してpush:
-
 ```bash
-git remote add origin https://github.com/<ユーザー名>/<リポジトリ名>.git
-git push -u origin main
+cd ~/research-timer
+git add .
+git commit -m "Add Supabase auth and cloud sync"
+git push
 ```
 
 ---
 
 ## Vercelでの公開手順
 
+### 1. 初回デプロイ
+
 1. [vercel.com](https://vercel.com) にGitHubアカウントでログイン
-2. **Add New Project** → GitHubのリポジトリを選択してインポート
-3. 設定はデフォルトのままで **Deploy** をクリック
+2. **Add New Project** → GitHubの `research-timer` リポジトリを選択
+3. **Environment Variables** に以下を追加：
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+4. **Deploy** をクリック
 
-Vercelは `package.json` の `build` スクリプトと出力先 `dist/` を自動検出します。
-`vercel.json` によりSPAのルーティングも正しく機能します。
+### 2. 既存プロジェクトへの環境変数追加
 
-デプロイ後、自動で公開URLが発行されます。以降は `git push` するたびに自動デプロイされます。
+Vercelダッシュボード → プロジェクト → **Settings → Environment Variables** で追加します。
+
+> 環境変数を追加・変更した後は **Redeploy** が必要です。
+
+以降は `git push` するたびに自動デプロイされます。
