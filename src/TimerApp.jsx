@@ -8,6 +8,13 @@ const POMODORO_WORK = 25 * 60
 const POMODORO_BREAK = 5 * 60
 const STORAGE_KEY = 'research-timer-sessions'
 
+const FAVORITE_WORDS = [
+  '人は自ら掴んだ本質しか、腹に落ちんのだ',
+  'その努力の先に神が宿るから',
+  '「審判の誤審」に窓さわれてしまった',
+  '少しの違いに歴戦の違いが宿る',
+]
+
 function loadLocalSessions() {
   try {
     return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
@@ -54,6 +61,38 @@ function CustomTooltip({ active, payload, label }) {
     )
   }
   return null
+}
+
+function RandomWord() {
+  const [word, setWord] = useState(() =>
+    FAVORITE_WORDS[Math.floor(Math.random() * FAVORITE_WORDS.length)]
+  )
+
+  const shuffle = () => {
+    const next = FAVORITE_WORDS[Math.floor(Math.random() * FAVORITE_WORDS.length)]
+    setWord(next)
+  }
+
+  return (
+    <div
+      onClick={shuffle}
+      style={{
+        marginTop: 8,
+        padding: '20px 24px',
+        textAlign: 'center',
+        color: '#aaa',
+        fontSize: 14,
+        fontStyle: 'italic',
+        cursor: 'pointer',
+        userSelect: 'none',
+        letterSpacing: '0.03em',
+        lineHeight: 1.7,
+      }}
+      title="クリックで切り替え"
+    >
+      {word}
+    </div>
+  )
 }
 
 export default function TimerApp({ user }) {
@@ -453,6 +492,8 @@ export default function TimerApp({ user }) {
           </div>
         </div>
       )}
+
+      <RandomWord />
     </div>
   )
 }
