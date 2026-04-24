@@ -13,6 +13,7 @@ const FAVORITE_WORDS = [
   'その努力の先に神が宿るから',
   '「審判の誤審」に惑わされてしまった',
   '少しの違いに歴戦の違いが宿る',
+  '不正解は無意味を意味しない。',
 ]
 
 function loadLocalSessions() {
