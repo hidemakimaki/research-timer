@@ -11,7 +11,7 @@ const STORAGE_KEY = 'research-timer-sessions'
 const FAVORITE_WORDS = [
   '人は自ら掴んだ本質しか、腹に落ちんのだ',
   'その努力の先に神が宿るから',
-  '「審判の誤審」に窓さわれてしまった',
+  '「審判の誤審」に惑わされてしまった',
   '少しの違いに歴戦の違いが宿る',
 ]
 
