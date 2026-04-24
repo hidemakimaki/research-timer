@@ -80,7 +80,7 @@ function RandomWord() {
         marginTop: 8,
         padding: '20px 24px',
         textAlign: 'center',
-        color: '#aaa',
+        color: '#666',
         fontSize: 14,
         fontStyle: 'italic',
         cursor: 'pointer',
