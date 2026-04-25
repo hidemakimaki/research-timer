@@ -348,9 +348,10 @@ export default function TimerApp({ user }) {
       musicRef.current?.pause()
       return
     }
+    const MUSIC_SRC = { ice: '/ice2.m4a', fire: '/fire.mp3' }
     if (!musicRef.current || musicKeyRef.current !== bgMusic) {
       musicRef.current?.pause()
-      const audio = new Audio(`/${bgMusic}.mp3`)
+      const audio = new Audio(MUSIC_SRC[bgMusic])
       audio.loop = true
       audio.volume = 0.4
       musicRef.current = audio
@@ -537,7 +538,7 @@ export default function TimerApp({ user }) {
         {isPomodoro && (
           <div style={{ display: 'flex', gap: 8 }}>
             {[
-              { key: 'off',  label: '🔇 off'  },
+              { key: 'off',  label: 'off'  },
               { key: 'ice',  label: '❄️ ice'  },
               { key: 'fire', label: '🔥 fire' },
             ].map(({ key, label }) => (
