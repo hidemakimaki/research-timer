@@ -3,6 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts'
 import { supabase } from './supabaseClient'
+import LogView from './LogView'
 
 const POMODORO_WORK = 25 * 60
 const POMODORO_BREAK = 5 * 60
@@ -160,6 +161,7 @@ export default function TimerApp({ user }) {
   const [sessionStart, setSessionStart] = useState(null)
   const [accumulatedWork, setAccumulatedWork] = useState(0)
   const [bgMusic, setBgMusic] = useState('off')
+  const [view, setView] = useState('timer')
 
   const intervalRef = useRef(null)
   const runStartRef = useRef(null)    // Date.now() when current run segment began
@@ -443,7 +445,7 @@ export default function TimerApp({ user }) {
       </div>
 
       {/* Migration Banner */}
-      {localData.length > 0 && (
+      {view === 'timer' && localData.length > 0 && (
         <div style={{
           background: '#fffbe6',
           border: '1px solid #ffe58f',
@@ -477,20 +479,19 @@ export default function TimerApp({ user }) {
         </div>
       )}
 
-      {/* Mode Toggle */}
-      <div style={{ display: 'flex', gap: 8 }}>
+      {/* Navigation */}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
         {['free', 'pomodoro'].map(m => (
           <button
             key={m}
-            onClick={() => switchMode(m)}
-            disabled={status !== 'idle'}
+            onClick={() => { setView('timer'); switchMode(m) }}
             style={{
               padding: '8px 20px',
               borderRadius: 20,
               border: 'none',
-              cursor: status !== 'idle' ? 'not-allowed' : 'pointer',
-              background: mode === m ? '#4f7cff' : '#e0e0e0',
-              color: mode === m ? '#fff' : '#555',
+              cursor: status !== 'idle' && view === 'timer' ? 'not-allowed' : 'pointer',
+              background: view === 'timer' && mode === m ? '#4f7cff' : '#e0e0e0',
+              color: view === 'timer' && mode === m ? '#fff' : '#555',
               fontWeight: 600,
               fontSize: 14,
               transition: 'background 0.2s',
@@ -499,7 +500,27 @@ export default function TimerApp({ user }) {
             {m === 'free' ? '自由計測' : 'ポモドーロ'}
           </button>
         ))}
+        <button
+          onClick={() => setView('log')}
+          style={{
+            padding: '8px 20px',
+            borderRadius: 6,
+            border: 'none',
+            cursor: 'pointer',
+            background: view === 'log' ? '#4f7cff' : '#e0e0e0',
+            color: view === 'log' ? '#fff' : '#555',
+            fontWeight: 600,
+            fontSize: 14,
+            transition: 'background 0.2s',
+          }}
+        >
+          ログ
+        </button>
       </div>
+
+      {view === 'log' && <LogView sessions={sessions} />}
+
+      {view === 'timer' && <>
 
       {/* Milestone label */}
       {milestone && (
@@ -689,6 +710,8 @@ export default function TimerApp({ user }) {
       )}
 
       <RandomWord />
+
+      </>}
     </div>
   )
 }
