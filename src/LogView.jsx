@@ -44,7 +44,7 @@ export default function LogView({ sessions }) {
   const monthTotal = monthEntries.reduce((sum, [, s]) => sum + s, 0)
   const achieveDays = monthEntries.filter(([, s]) => s >= 25 * 60).length
 
-  const todayStr = now.toISOString().slice(0, 10)
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 
   const prevMonth = () => {
     if (month === 0) { setYear(y => y - 1); setMonth(11) }
