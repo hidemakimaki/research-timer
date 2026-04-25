@@ -137,6 +137,8 @@ export default function TimerApp({ user }) {
   const runStartRef = useRef(null)    // Date.now() when current run segment began
   const baseElapsedRef = useRef(0)    // free: seconds accumulated before current run
   const baseLeftRef = useRef(POMODORO_WORK) // pomodoro: seconds left at start of current run
+  const sessionStartRef = useRef(null)
+  const userIdRef = useRef(user.id)
 
   // Load sessions from Supabase
   const fetchSessions = useCallback(async () => {
@@ -150,6 +152,7 @@ export default function TimerApp({ user }) {
   }, [user.id])
 
   useEffect(() => { fetchSessions() }, [fetchSessions])
+  useEffect(() => { sessionStartRef.current = sessionStart }, [sessionStart])
 
   // Migrate localStorage data to Supabase
   const migrateLocalData = async () => {
@@ -196,7 +199,17 @@ export default function TimerApp({ user }) {
         clearInterval_()
         playChime()
         if (phase === 'work') {
-          setAccumulatedWork(w => w + POMODORO_WORK)
+          // Save completed Pomodoro session immediately
+          const start = sessionStartRef.current || new Date()
+          supabase.from('sessions').insert({
+            user_id: userIdRef.current,
+            date: toDateStr(start),
+            started_at: start.toISOString(),
+            duration: POMODORO_WORK,
+            mode: 'pomodoro',
+          }).select().single().then(({ data }) => {
+            if (data) setSessions(prev => [data, ...prev])
+          })
           setPhase('break')
           setPomodoroLeft(POMODORO_BREAK)
           // Auto-start break timer
