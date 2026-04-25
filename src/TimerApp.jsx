@@ -210,6 +210,14 @@ export default function TimerApp({ user }) {
     .reduce((sum, s) => sum + s.duration, 0)
   const chartData = buildChartData(sessions)
 
+  const milestone = todayTotal >= 100 * 60
+    ? { label: 'Legendary!', bg: '#fff0f0' }
+    : todayTotal >= 50 * 60
+    ? { label: 'Great work!', bg: '#f0f4ff' }
+    : todayTotal >= 25 * 60
+    ? { label: 'Good!', bg: '#f0fff4' }
+    : null
+
   const clearInterval_ = useCallback(() => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current)
@@ -380,6 +388,11 @@ export default function TimerApp({ user }) {
 
   useEffect(() => () => { musicRef.current?.pause() }, [])
 
+  useEffect(() => {
+    document.body.style.background = milestone?.bg || '#f5f5f5'
+    return () => { document.body.style.background = '' }
+  }, [milestone?.bg])
+
   // Recalculate immediately when screen wakes from standby
   useEffect(() => {
     const handleVisibility = () => {
@@ -487,6 +500,19 @@ export default function TimerApp({ user }) {
           </button>
         ))}
       </div>
+
+      {/* Milestone label */}
+      {milestone && (
+        <div style={{
+          textAlign: 'center',
+          fontSize: 22,
+          fontWeight: 700,
+          color: '#444',
+          letterSpacing: '0.04em',
+        }}>
+          {milestone.label}
+        </div>
+      )}
 
       {/* Timer Card */}
       <div style={{
