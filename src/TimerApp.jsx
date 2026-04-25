@@ -17,55 +17,21 @@ const FAVORITE_WORDS = [
   '不正解は無意味を意味しない。',
 ]
 
-// Shared AudioContext — must be created/resumed inside a user gesture on iOS
-let sharedAudioCtx = null
-
-function getAudioCtx() {
-  if (!sharedAudioCtx) {
-    sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)()
-  }
-  return sharedAudioCtx
+// ポモドーロ終了: 2回連続再生
+function playWorkChime() {
+  const a = new Audio('/pomodoro-end.mp3')
+  a.play().catch(() => {})
+  a.addEventListener('ended', () => {
+    const a2 = new Audio('/pomodoro-end.mp3')
+    a2.play().catch(() => {})
+  })
 }
 
-function unlockAudio() {
-  try {
-    const ctx = getAudioCtx()
-    if (ctx.state === 'suspended') ctx.resume()
-  } catch {}
+// 休憩終了: 1回再生
+function playBreakChime() {
+  const a = new Audio('/break-end.mp3')
+  a.play().catch(() => {})
 }
-
-function playNotes(notes, volume = 0.35, duration = 1.5) {
-  try {
-    const ctx = getAudioCtx()
-    const doPlay = () => {
-      notes.forEach((freq, i) => {
-        const osc = ctx.createOscillator()
-        const gain = ctx.createGain()
-        osc.connect(gain)
-        gain.connect(ctx.destination)
-        osc.type = 'sine'
-        osc.frequency.value = freq
-        const t = ctx.currentTime + i * 0.35
-        gain.gain.setValueAtTime(0, t)
-        gain.gain.linearRampToValueAtTime(volume, t + 0.02)
-        gain.gain.exponentialRampToValueAtTime(0.001, t + duration)
-        osc.start(t)
-        osc.stop(t + duration)
-      })
-    }
-    // Resume context if suspended (e.g. after standby), then play
-    if (ctx.state === 'suspended') {
-      ctx.resume().then(doPlay)
-    } else {
-      doPlay()
-    }
-  } catch {}
-}
-
-// 作業終了: C5→E5→G5 (ascending)
-function playWorkChime() { playNotes([523.25, 659.25, 783.99]) }
-// 休憩終了: G5→E5→C5 (descending, softer)
-function playBreakChime() { playNotes([783.99, 659.25, 523.25], 0.28, 1.2) }
 
 function loadLocalSessions() {
   try {
@@ -308,7 +274,6 @@ export default function TimerApp({ user }) {
 
   const start = useCallback(() => {
     if (status === 'running') return
-    unlockAudio() // iOS requires AudioContext to be resumed inside a user gesture
     pendingAlarmRef.current = null
     setAlarmMessage(null)
     document.title = '研究タイマー'
@@ -435,7 +400,6 @@ export default function TimerApp({ user }) {
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
-        unlockAudio() // re-unlock AudioContext after standby
         // Replay alarm if it fired while page was hidden/audio was suspended
         if (pendingAlarmRef.current === 'work') playWorkChime()
         else if (pendingAlarmRef.current === 'break') playBreakChime()
