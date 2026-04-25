@@ -11,6 +11,11 @@ body {
   min-height: 100vh;
 }
 
+.auth-outer {
+  min-height: 100vh;    /* fallback for older iOS */
+  min-height: 100dvh;  /* dynamic viewport: excludes browser chrome on iOS 16+ */
+}
+
 #root {
   max-width: 900px;
   margin: 0 auto;
