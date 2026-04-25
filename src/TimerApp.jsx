@@ -165,6 +165,7 @@ export default function TimerApp({ user }) {
   const [accumulatedWork, setAccumulatedWork] = useState(0)
   const [bgMusic, setBgMusic] = useState('off')
   const [view, setView] = useState('timer')
+  const [alarmMessage, setAlarmMessage] = useState(null)
 
   const intervalRef = useRef(null)
   const runStartRef = useRef(null)    // Date.now() when current run segment began
@@ -174,6 +175,7 @@ export default function TimerApp({ user }) {
   const userIdRef = useRef(user.id)
   const musicRef = useRef(null)
   const musicKeyRef = useRef('off')
+  const pendingAlarmRef = useRef(null) // 'work' | 'break' | null — pending alarm to retry on visibility
 
   // Load sessions from Supabase
   const fetchSessions = useCallback(async () => {
@@ -260,8 +262,14 @@ export default function TimerApp({ user }) {
       if (newLeft <= 0) {
         clearInterval_()
         if (phase === 'work') {
+          pendingAlarmRef.current = 'work'
+          setAlarmMessage('⏰ 作業終了！ 休憩に入りましょう')
+          document.title = '⏰ ポモドーロ終了！'
           playWorkChime()
         } else {
+          pendingAlarmRef.current = 'break'
+          setAlarmMessage('⏰ 休憩終了！ 次のポモドーロを始めましょう')
+          document.title = '⏰ 休憩終了！'
           playBreakChime()
         }
         if (phase === 'work') {
@@ -301,6 +309,9 @@ export default function TimerApp({ user }) {
   const start = useCallback(() => {
     if (status === 'running') return
     unlockAudio() // iOS requires AudioContext to be resumed inside a user gesture
+    pendingAlarmRef.current = null
+    setAlarmMessage(null)
+    document.title = '研究タイマー'
     runStartRef.current = Date.now()
     if (status === 'idle') {
       setSessionStart(new Date())
@@ -364,6 +375,9 @@ export default function TimerApp({ user }) {
       if (data) setSessions(prev => [data, ...prev])
     }
 
+    pendingAlarmRef.current = null
+    setAlarmMessage(null)
+    document.title = '研究タイマー'
     setStatus('idle')
     setElapsed(0)
     setPomodoroLeft(POMODORO_WORK)
@@ -417,11 +431,14 @@ export default function TimerApp({ user }) {
     return () => { document.body.style.background = '' }
   }, [milestone?.bg])
 
-  // Recalculate immediately when screen wakes from standby
+  // Recalculate immediately when screen wakes from standby; retry alarm if pending
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
         unlockAudio() // re-unlock AudioContext after standby
+        // Replay alarm if it fired while page was hidden/audio was suspended
+        if (pendingAlarmRef.current === 'work') playWorkChime()
+        else if (pendingAlarmRef.current === 'break') playBreakChime()
         tickRef.current()
       }
     }
@@ -554,6 +571,42 @@ export default function TimerApp({ user }) {
           letterSpacing: '0.04em',
         }}>
           {milestone.label}{isLegendary ? ` ${legendaryEmoji}` : ''}
+        </div>
+      )}
+
+      {/* Alarm Banner */}
+      {alarmMessage && (
+        <div style={{
+          background: '#fff3cd',
+          border: '2px solid #ffc107',
+          borderRadius: 12,
+          padding: '16px 20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+          animation: 'pulse 1s infinite',
+        }}>
+          <span style={{ fontSize: 16, fontWeight: 700, color: '#856404' }}>{alarmMessage}</span>
+          <button
+            onClick={() => {
+              pendingAlarmRef.current = null
+              setAlarmMessage(null)
+              document.title = '研究タイマー'
+            }}
+            style={{
+              padding: '6px 16px',
+              background: '#ffc107',
+              border: 'none',
+              borderRadius: 6,
+              fontWeight: 700,
+              fontSize: 13,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            OK
+          </button>
         </div>
       )}
 
