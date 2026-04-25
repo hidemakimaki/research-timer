@@ -16,9 +16,26 @@ const FAVORITE_WORDS = [
   '不正解は無意味を意味しない。',
 ]
 
+// Shared AudioContext — must be created/resumed inside a user gesture on iOS
+let sharedAudioCtx = null
+
+function getAudioCtx() {
+  if (!sharedAudioCtx) {
+    sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)()
+  }
+  return sharedAudioCtx
+}
+
+function unlockAudio() {
+  try {
+    const ctx = getAudioCtx()
+    if (ctx.state === 'suspended') ctx.resume()
+  } catch {}
+}
+
 function playChime() {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)()
+    const ctx = getAudioCtx()
     const notes = [523.25, 659.25, 783.99] // C5, E5, G5
     notes.forEach((freq, i) => {
       const osc = ctx.createOscillator()
@@ -234,6 +251,7 @@ export default function TimerApp({ user }) {
 
   const start = useCallback(() => {
     if (status === 'running') return
+    unlockAudio() // iOS requires AudioContext to be resumed inside a user gesture
     runStartRef.current = Date.now()
     if (status === 'idle') {
       setSessionStart(new Date())
