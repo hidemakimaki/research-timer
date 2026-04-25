@@ -41,6 +41,7 @@ export default function AuthPage() {
       justifyContent: 'center',
       background: '#f5f5f5',
       padding: '0 16px',
+      paddingBottom: '25vh',
     }}>
       <div style={{
         background: '#fff',
