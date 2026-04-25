@@ -16,6 +16,29 @@ const FAVORITE_WORDS = [
   '不正解は無意味を意味しない。',
 ]
 
+function playChime() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)()
+    const notes = [523.25, 659.25, 783.99] // C5, E5, G5
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.type = 'sine'
+      osc.frequency.value = freq
+      const t = ctx.currentTime + i * 0.35
+      gain.gain.setValueAtTime(0, t)
+      gain.gain.linearRampToValueAtTime(0.35, t + 0.02)
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 1.5)
+      osc.start(t)
+      osc.stop(t + 1.5)
+    })
+  } catch {
+    // Audio API not available
+  }
+}
+
 function loadLocalSessions() {
   try {
     return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
@@ -171,16 +194,22 @@ export default function TimerApp({ user }) {
       const newLeft = baseLeftRef.current - secondsIntoRun
       if (newLeft <= 0) {
         clearInterval_()
-        runStartRef.current = null
+        playChime()
         if (phase === 'work') {
           setAccumulatedWork(w => w + POMODORO_WORK)
           setPhase('break')
           setPomodoroLeft(POMODORO_BREAK)
+          // Auto-start break timer
+          baseLeftRef.current = POMODORO_BREAK
+          runStartRef.current = Date.now()
+          setStatus('running')
+          intervalRef.current = setInterval(() => tickRef.current(), 1000)
         } else {
+          runStartRef.current = null
           setPhase('work')
           setPomodoroLeft(POMODORO_WORK)
+          setStatus('idle')
         }
-        setStatus('idle')
       } else {
         setPomodoroLeft(newLeft)
       }
