@@ -357,7 +357,7 @@ export default function TimerApp({ user }) {
 
   // Background music — plays only during Pomodoro work phase
   useEffect(() => {
-    const shouldPlay = status === 'running' && mode === 'pomodoro' && phase === 'work' && bgMusic !== 'off'
+    const shouldPlay = status === 'running' && bgMusic !== 'off' && (mode === 'free' || phase === 'work')
     if (!shouldPlay) {
       musicRef.current?.pause()
       return
@@ -550,8 +550,7 @@ export default function TimerApp({ user }) {
           )}
         </div>
 
-        {isPomodoro && (
-          <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8 }}>
             {[
               { key: 'off',  label: 'off'  },
               { key: 'ice',  label: '❄️ ice'  },
@@ -576,7 +575,6 @@ export default function TimerApp({ user }) {
               </button>
             ))}
           </div>
-        )}
       </div>
 
       {/* Today's Total */}
