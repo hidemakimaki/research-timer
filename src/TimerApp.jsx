@@ -8,6 +8,13 @@ import LogView from './LogView'
 const POMODORO_WORK = 25 * 60
 const POMODORO_BREAK = 5 * 60
 const STORAGE_KEY = 'research-timer-sessions'
+const LEGENDARY_KEY = 'research-timer-legendary'
+
+function loadLegendaryHistory() {
+  try {
+    return JSON.parse(localStorage.getItem(LEGENDARY_KEY) || '[]')
+  } catch { return [] }
+}
 
 const FAVORITE_WORDS = [
   '人は自ら掴んだ本質しか、腹に落ちんのだ',
@@ -121,6 +128,7 @@ export default function TimerApp({ user }) {
   const [sessionsLoading, setSessionsLoading] = useState(true)
   const [localData, setLocalData] = useState(loadLocalSessions)
   const [migrating, setMigrating] = useState(false)
+  const [legendaryHistory, setLegendaryHistory] = useState(loadLegendaryHistory)
 
   const [mode, setMode] = useState('free')
   const [phase, setPhase] = useState('work')
@@ -209,6 +217,18 @@ export default function TimerApp({ user }) {
     }
     return '🧸'
   }, [isLegendary])
+
+  // Record legendary emoji once per day when milestone is first reached
+  useEffect(() => {
+    if (!isLegendary || !legendaryEmoji) return
+    const todayStr = toDateStr(new Date())
+    setLegendaryHistory(prev => {
+      if (prev.some(e => e.date === todayStr)) return prev
+      const updated = [...prev, { date: todayStr, emoji: legendaryEmoji }]
+      localStorage.setItem(LEGENDARY_KEY, JSON.stringify(updated))
+      return updated
+    })
+  }, [isLegendary, legendaryEmoji])
 
   const clearInterval_ = useCallback(() => {
     if (intervalRef.current) {
@@ -521,7 +541,7 @@ export default function TimerApp({ user }) {
         </button>
       </div>
 
-      {view === 'log' && <LogView sessions={sessions} />}
+      {view === 'log' && <LogView sessions={sessions} legendaryHistory={legendaryHistory} />}
 
       {view === 'timer' && <>
 

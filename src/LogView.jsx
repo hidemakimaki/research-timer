@@ -17,7 +17,7 @@ function getMark(secs) {
   return null
 }
 
-export default function LogView({ sessions }) {
+export default function LogView({ sessions, legendaryHistory = [] }) {
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth())
@@ -151,6 +151,55 @@ export default function LogView({ sessions }) {
         <span style={{ color: '#4f7cff' }}>◎ 100分+</span>
       </div>
 
+      {/* Legendary Items */}
+      {legendaryHistory.length > 0 && <LegendaryItems history={legendaryHistory} />}
+
+    </div>
+  )
+}
+
+function LegendaryItems({ history }) {
+  const counts = {}
+  history.forEach(({ emoji }) => {
+    counts[emoji] = (counts[emoji] || 0) + 1
+  })
+  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1])
+
+  return (
+    <div style={{
+      background: 'linear-gradient(135deg, #fff8e1 0%, #fff3e0 100%)',
+      border: '1.5px solid #ffd54f',
+      borderRadius: 16,
+      padding: '20px 24px',
+      boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <h2 style={{ fontSize: 15, fontWeight: 700, color: '#5d4037' }}>
+          Legendary Items
+        </h2>
+        <span style={{ fontSize: 13, color: '#8d6e63', fontWeight: 600 }}>
+          計 {history.length} 日
+        </span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {sorted.map(([emoji, count]) => (
+          <div key={emoji} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 24, lineHeight: 1 }}>{emoji}</span>
+            <div style={{ flex: 1, background: '#ffe0b2', borderRadius: 100, height: 8, overflow: 'hidden' }}>
+              <div style={{
+                height: '100%',
+                borderRadius: 100,
+                background: '#ff9800',
+                width: `${(count / history.length) * 100}%`,
+                transition: 'width 0.4s ease',
+              }} />
+            </div>
+            <span style={{ fontSize: 14, fontWeight: 700, color: '#5d4037', minWidth: 28, textAlign: 'right' }}>
+              {count}回
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
