@@ -33,28 +33,38 @@ function unlockAudio() {
   } catch {}
 }
 
-function playChime() {
+function playNotes(notes, volume = 0.35, duration = 1.5) {
   try {
     const ctx = getAudioCtx()
-    const notes = [523.25, 659.25, 783.99] // C5, E5, G5
-    notes.forEach((freq, i) => {
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
-      osc.connect(gain)
-      gain.connect(ctx.destination)
-      osc.type = 'sine'
-      osc.frequency.value = freq
-      const t = ctx.currentTime + i * 0.35
-      gain.gain.setValueAtTime(0, t)
-      gain.gain.linearRampToValueAtTime(0.35, t + 0.02)
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 1.5)
-      osc.start(t)
-      osc.stop(t + 1.5)
-    })
-  } catch {
-    // Audio API not available
-  }
+    const doPlay = () => {
+      notes.forEach((freq, i) => {
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        osc.type = 'sine'
+        osc.frequency.value = freq
+        const t = ctx.currentTime + i * 0.35
+        gain.gain.setValueAtTime(0, t)
+        gain.gain.linearRampToValueAtTime(volume, t + 0.02)
+        gain.gain.exponentialRampToValueAtTime(0.001, t + duration)
+        osc.start(t)
+        osc.stop(t + duration)
+      })
+    }
+    // Resume context if suspended (e.g. after standby), then play
+    if (ctx.state === 'suspended') {
+      ctx.resume().then(doPlay)
+    } else {
+      doPlay()
+    }
+  } catch {}
 }
+
+// 作業終了: C5→E5→G5 (ascending)
+function playWorkChime() { playNotes([523.25, 659.25, 783.99]) }
+// 休憩終了: G5→E5→C5 (descending, softer)
+function playBreakChime() { playNotes([783.99, 659.25, 523.25], 0.28, 1.2) }
 
 function loadLocalSessions() {
   try {
@@ -217,7 +227,11 @@ export default function TimerApp({ user }) {
       const newLeft = baseLeftRef.current - secondsIntoRun
       if (newLeft <= 0) {
         clearInterval_()
-        playChime()
+        if (phase === 'work') {
+          playWorkChime()
+        } else {
+          playBreakChime()
+        }
         if (phase === 'work') {
           // Save completed Pomodoro session immediately
           const start = sessionStartRef.current || new Date()
@@ -366,6 +380,7 @@ export default function TimerApp({ user }) {
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
+        unlockAudio() // re-unlock AudioContext after standby
         tickRef.current()
       }
     }
