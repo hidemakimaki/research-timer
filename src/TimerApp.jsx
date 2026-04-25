@@ -111,7 +111,9 @@ export default function TimerApp({ user }) {
   const [accumulatedWork, setAccumulatedWork] = useState(0)
 
   const intervalRef = useRef(null)
-  const startTimeRef = useRef(null)
+  const runStartRef = useRef(null)    // Date.now() when current run segment began
+  const baseElapsedRef = useRef(0)    // free: seconds accumulated before current run
+  const baseLeftRef = useRef(POMODORO_WORK) // pomodoro: seconds left at start of current run
 
   // Load sessions from Supabase
   const fetchSessions = useCallback(async () => {
@@ -160,30 +162,29 @@ export default function TimerApp({ user }) {
   }, [])
 
   const tick = useCallback(() => {
-    if (!startTimeRef.current) return
-    const now = Date.now()
+    if (!runStartRef.current) return
+    const secondsIntoRun = Math.floor((Date.now() - runStartRef.current) / 1000)
 
     if (mode === 'free') {
-      setElapsed(prev => prev + 1)
+      setElapsed(baseElapsedRef.current + secondsIntoRun)
     } else {
-      setPomodoroLeft(prev => {
-        const next = prev - 1
-        if (next <= 0) {
-          clearInterval_()
-          if (phase === 'work') {
-            setAccumulatedWork(w => w + POMODORO_WORK)
-            setPhase('break')
-            setPomodoroLeft(POMODORO_BREAK)
-          } else {
-            setPhase('work')
-            setPomodoroLeft(POMODORO_WORK)
-          }
-          setStatus('idle')
+      const newLeft = baseLeftRef.current - secondsIntoRun
+      if (newLeft <= 0) {
+        clearInterval_()
+        runStartRef.current = null
+        if (phase === 'work') {
+          setAccumulatedWork(w => w + POMODORO_WORK)
+          setPhase('break')
+          setPomodoroLeft(POMODORO_BREAK)
+        } else {
+          setPhase('work')
+          setPomodoroLeft(POMODORO_WORK)
         }
-        return Math.max(next, 0)
-      })
+        setStatus('idle')
+      } else {
+        setPomodoroLeft(newLeft)
+      }
     }
-    startTimeRef.current = now
   }, [mode, phase, clearInterval_])
 
   const tickRef = useRef(tick)
@@ -191,26 +192,53 @@ export default function TimerApp({ user }) {
 
   const start = useCallback(() => {
     if (status === 'running') return
-    startTimeRef.current = Date.now()
+    runStartRef.current = Date.now()
     if (status === 'idle') {
       setSessionStart(new Date())
-      if (mode === 'free') setElapsed(0)
+      if (mode === 'free') {
+        setElapsed(0)
+        baseElapsedRef.current = 0
+      } else {
+        baseLeftRef.current = pomodoroLeft
+      }
+    } else {
+      // resuming from pause: pick up from current displayed values
+      baseElapsedRef.current = elapsed
+      baseLeftRef.current = pomodoroLeft
     }
     setStatus('running')
     intervalRef.current = setInterval(() => tickRef.current(), 1000)
-  }, [status, mode])
+  }, [status, mode, elapsed, pomodoroLeft])
 
   const pause = useCallback(() => {
     if (status !== 'running') return
     clearInterval_()
+    // Sync state to exact current time before freezing
+    if (runStartRef.current) {
+      const s = Math.floor((Date.now() - runStartRef.current) / 1000)
+      if (mode === 'free') {
+        setElapsed(baseElapsedRef.current + s)
+      } else {
+        setPomodoroLeft(prev => Math.max(0, baseLeftRef.current - s))
+      }
+      runStartRef.current = null
+    }
     setStatus('paused')
-  }, [status, clearInterval_])
+  }, [status, clearInterval_, mode])
 
   const stop = useCallback(async () => {
     clearInterval_()
+    // Get accurate time (may be mid-interval when stop is pressed)
+    const finalElapsed = runStartRef.current
+      ? baseElapsedRef.current + Math.floor((Date.now() - runStartRef.current) / 1000)
+      : elapsed
+    const finalLeft = runStartRef.current
+      ? Math.max(0, baseLeftRef.current - Math.floor((Date.now() - runStartRef.current) / 1000))
+      : pomodoroLeft
+    runStartRef.current = null
     const workSeconds = mode === 'free'
-      ? elapsed
-      : accumulatedWork + (phase === 'work' ? POMODORO_WORK - pomodoroLeft : 0)
+      ? finalElapsed
+      : accumulatedWork + (phase === 'work' ? POMODORO_WORK - finalLeft : 0)
 
     if (workSeconds > 0) {
       const { data } = await supabase
@@ -249,6 +277,17 @@ export default function TimerApp({ user }) {
   }
 
   useEffect(() => () => clearInterval_(), [clearInterval_])
+
+  // Recalculate immediately when screen wakes from standby
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        tickRef.current()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [])
 
   const isPomodoro = mode === 'pomodoro'
   const displayTime = isPomodoro ? pomodoroLeft : elapsed
