@@ -368,6 +368,10 @@ export default function TimerApp({ user }) {
       const audio = new Audio(MUSIC_SRC[bgMusic])
       audio.loop = true
       audio.volume = 0.4
+      audio.addEventListener('ended', () => {
+        audio.currentTime = 0
+        audio.play().catch(() => {})
+      })
       musicRef.current = audio
       musicKeyRef.current = bgMusic
     }
