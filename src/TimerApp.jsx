@@ -149,6 +149,7 @@ export default function TimerApp({ user }) {
   const [pomodoroLeft, setPomodoroLeft] = useState(POMODORO_WORK)
   const [sessionStart, setSessionStart] = useState(null)
   const [accumulatedWork, setAccumulatedWork] = useState(0)
+  const [bgMusic, setBgMusic] = useState('off')
 
   const intervalRef = useRef(null)
   const runStartRef = useRef(null)    // Date.now() when current run segment began
@@ -156,6 +157,8 @@ export default function TimerApp({ user }) {
   const baseLeftRef = useRef(POMODORO_WORK) // pomodoro: seconds left at start of current run
   const sessionStartRef = useRef(null)
   const userIdRef = useRef(user.id)
+  const musicRef = useRef(null)
+  const musicKeyRef = useRef('off')
 
   // Load sessions from Supabase
   const fetchSessions = useCallback(async () => {
@@ -338,6 +341,26 @@ export default function TimerApp({ user }) {
 
   useEffect(() => () => clearInterval_(), [clearInterval_])
 
+  // Background music — plays only during Pomodoro work phase
+  useEffect(() => {
+    const shouldPlay = status === 'running' && mode === 'pomodoro' && phase === 'work' && bgMusic !== 'off'
+    if (!shouldPlay) {
+      musicRef.current?.pause()
+      return
+    }
+    if (!musicRef.current || musicKeyRef.current !== bgMusic) {
+      musicRef.current?.pause()
+      const audio = new Audio(`/${bgMusic}.mp3`)
+      audio.loop = true
+      audio.volume = 0.4
+      musicRef.current = audio
+      musicKeyRef.current = bgMusic
+    }
+    musicRef.current.play().catch(() => {})
+  }, [status, phase, mode, bgMusic])
+
+  useEffect(() => () => { musicRef.current?.pause() }, [])
+
   // Recalculate immediately when screen wakes from standby
   useEffect(() => {
     const handleVisibility = () => {
@@ -510,6 +533,34 @@ export default function TimerApp({ user }) {
             </>
           )}
         </div>
+
+        {isPomodoro && (
+          <div style={{ display: 'flex', gap: 8 }}>
+            {[
+              { key: 'off',  label: '🔇 off'  },
+              { key: 'ice',  label: '❄️ ice'  },
+              { key: 'fire', label: '🔥 fire' },
+            ].map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setBgMusic(key)}
+                style={{
+                  padding: '6px 16px',
+                  borderRadius: 20,
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: bgMusic === key ? '#4f7cff' : '#e8e8e8',
+                  color: bgMusic === key ? '#fff' : '#666',
+                  fontWeight: 600,
+                  fontSize: 13,
+                  transition: 'background 0.2s',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Today's Total */}
