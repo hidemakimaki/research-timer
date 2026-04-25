@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts'
@@ -219,6 +219,25 @@ export default function TimerApp({ user }) {
     : todayTotal >= 25 * 60
     ? { label: 'Good!', bg: '#f0fff4' }
     : null
+
+  const isLegendary = todayTotal >= 100 * 60
+  const legendaryEmoji = useMemo(() => {
+    if (!isLegendary) return ''
+    const EMOJIS = [
+      { e: '🌟', w: 10 },
+      { e: '🌍', w: 10 },
+      { e: '🦖', w: 15 },
+      { e: '🚀', w: 15 },
+      { e: '🌊', w: 20 },
+      { e: '🧸', w: 30 },
+    ]
+    let r = Math.random() * 100
+    for (const { e, w } of EMOJIS) {
+      r -= w
+      if (r <= 0) return e
+    }
+    return '🧸'
+  }, [isLegendary])
 
   const clearInterval_ = useCallback(() => {
     if (intervalRef.current) {
@@ -531,7 +550,7 @@ export default function TimerApp({ user }) {
           color: '#444',
           letterSpacing: '0.04em',
         }}>
-          {milestone.label}
+          {milestone.label}{isLegendary ? ` ${legendaryEmoji}` : ''}
         </div>
       )}
 
