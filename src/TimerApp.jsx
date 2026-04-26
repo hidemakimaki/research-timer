@@ -285,11 +285,11 @@ export default function TimerApp({ user }) {
       done.add('50')
       const emoji = roll50Emoji()
       setFiftyEmoji(emoji)
-      newMilestones.push({ level: 50, base: 5, bonusEmoji: emoji, bonusPoints: get50Bonus(emoji) })
+      newMilestones.push({ level: 50, base: 2, bonusEmoji: emoji, bonusPoints: get50Bonus(emoji) })
     }
     if (todayTotal >= 100 * 60 && !done.has('100') && legendaryEmoji) {
       done.add('100')
-      newMilestones.push({ level: 100, base: 8, bonusEmoji: legendaryEmoji, bonusPoints: get100Bonus(legendaryEmoji) })
+      newMilestones.push({ level: 100, base: 3, bonusEmoji: legendaryEmoji, bonusPoints: get100Bonus(legendaryEmoji) })
     }
 
     if (newMilestones.length === 0) return
