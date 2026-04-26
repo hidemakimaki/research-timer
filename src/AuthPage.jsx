@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import { validateDisplayName } from './validateDisplayName'
 
@@ -7,9 +7,17 @@ export default function AuthPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
+  const [communityId, setCommunityId] = useState('')
+  const [communities, setCommunities] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+
+  useEffect(() => {
+    supabase.from('communities').select('id, name').order('name').then(({ data }) => {
+      if (data) setCommunities(data)
+    })
+  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -23,11 +31,12 @@ export default function AuthPage() {
     } else {
       const nameError = validateDisplayName(displayName)
       if (nameError) { setError(nameError); setLoading(false); return }
+      if (!communityId) { setError('コミュニティを選択してください'); setLoading(false); return }
 
       const { error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { display_name: displayName.trim() } },
+        options: { data: { display_name: displayName.trim(), community_id: communityId } },
       })
       if (error) {
         setError(error.message)
@@ -43,6 +52,7 @@ export default function AuthPage() {
     setError('')
     setMessage('')
     setDisplayName('')
+    setCommunityId('')
   }
 
   return (
@@ -71,19 +81,35 @@ export default function AuthPage() {
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {!isLogin && (
-            <div>
-              <label style={labelStyle}>表示名</label>
-              <input
-                type="text"
-                value={displayName}
-                onChange={e => setDisplayName(e.target.value)}
-                required
-                style={inputStyle}
-                placeholder="例: 研究者タロウ"
-                maxLength={25}
-              />
-              <p style={hintStyle}>3〜20文字・日本語英数字OK・絵文字2個まで</p>
-            </div>
+            <>
+              <div>
+                <label style={labelStyle}>表示名</label>
+                <input
+                  type="text"
+                  value={displayName}
+                  onChange={e => setDisplayName(e.target.value)}
+                  required
+                  style={inputStyle}
+                  placeholder="例: 研究者タロウ"
+                  maxLength={25}
+                />
+                <p style={hintStyle}>3〜20文字・日本語英数字OK・絵文字2個まで</p>
+              </div>
+              <div>
+                <label style={labelStyle}>コミュニティ</label>
+                <select
+                  value={communityId}
+                  onChange={e => setCommunityId(e.target.value)}
+                  required
+                  style={{ ...inputStyle, color: communityId ? '#333' : '#aaa' }}
+                >
+                  <option value="">選択してください</option>
+                  {communities.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+            </>
           )}
           <div>
             <label style={labelStyle}>メールアドレス</label>

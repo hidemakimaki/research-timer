@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
-import { validateDisplayName } from './validateDisplayName'
 
-export default function DisplayNamePage({ user, onSaved }) {
-  const [displayName, setDisplayName] = useState('')
+export default function CommunitySelectPage({ user, profile, onSaved }) {
   const [communityId, setCommunityId] = useState('')
   const [communities, setCommunities] = useState([])
   const [loading, setLoading] = useState(false)
@@ -17,19 +15,13 @@ export default function DisplayNamePage({ user, onSaved }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setError('')
-    const nameError = validateDisplayName(displayName)
-    if (nameError) { setError(nameError); return }
     if (!communityId) { setError('コミュニティを選択してください'); return }
-
     setLoading(true)
-    const trimmed = displayName.trim()
     const { data, error: dbError } = await supabase
       .from('profiles')
-      .upsert({ id: user.id, display_name: trimmed, community_id: communityId, updated_at: new Date().toISOString() })
+      .upsert({ id: user.id, community_id: communityId, updated_at: new Date().toISOString() })
       .select()
       .single()
-
     if (dbError) {
       setError('保存に失敗しました。再度お試しください。')
     } else {
@@ -61,27 +53,12 @@ export default function DisplayNamePage({ user, onSaved }) {
         maxWidth: 380,
         boxShadow: '0 2px 16px rgba(0,0,0,0.09)',
       }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: '#222', marginBottom: 4 }}>表示名を設定</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 700, color: '#222', marginBottom: 4 }}>コミュニティを選択</h1>
         <p style={{ fontSize: 14, color: '#888', marginBottom: 28 }}>
-          ランキングなどに使用される名前を設定してください
+          {profile?.display_name} さん、所属コミュニティを設定してください
         </p>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div>
-            <label style={labelStyle}>表示名</label>
-            <input
-              type="text"
-              value={displayName}
-              onChange={e => setDisplayName(e.target.value)}
-              required
-              autoFocus
-              style={inputStyle}
-              placeholder="例: 研究者タロウ"
-              maxLength={25}
-            />
-            <p style={hintStyle}>3〜20文字・日本語英数字OK・絵文字2個まで</p>
-          </div>
-
           <div>
             <label style={labelStyle}>コミュニティ</label>
             <select
@@ -127,7 +104,7 @@ export default function DisplayNamePage({ user, onSaved }) {
             onClick={handleLogout}
             style={{ background: 'none', border: 'none', color: '#bbb', cursor: 'pointer', fontSize: 12, padding: 0 }}
           >
-            別のアカウントでログイン
+            ログアウト
           </button>
         </p>
       </div>
@@ -152,10 +129,4 @@ const inputStyle = {
   outline: 'none',
   boxSizing: 'border-box',
   transition: 'border-color 0.15s',
-}
-
-const hintStyle = {
-  fontSize: 11,
-  color: '#aaa',
-  margin: '4px 0 0',
 }

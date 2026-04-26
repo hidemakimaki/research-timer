@@ -18,19 +18,19 @@ function getMark(secs) {
   return null
 }
 
-export default function LogView({ sessions, legendaryHistory = [], totalPoints = 0, displayName = '' }) {
+export default function LogView({ sessions, legendaryHistory = [], totalPoints = 0, displayName = '', communityId = null }) {
   const [weeklyRanking, setWeeklyRanking] = useState(null)  // null = loading
   const [monthlyRanking, setMonthlyRanking] = useState(null)
 
   useEffect(() => {
     Promise.all([
-      supabase.rpc('get_ranking', { period: 'week' }),
-      supabase.rpc('get_ranking', { period: 'month' }),
+      supabase.rpc('get_ranking', { period: 'week', p_community_id: communityId }),
+      supabase.rpc('get_ranking', { period: 'month', p_community_id: communityId }),
     ]).then(([weekly, monthly]) => {
       setWeeklyRanking(weekly.data || [])
       setMonthlyRanking(monthly.data || [])
     })
-  }, [])
+  }, [communityId])
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth())

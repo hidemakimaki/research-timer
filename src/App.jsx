@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import AuthPage from './AuthPage'
 import DisplayNamePage from './DisplayNamePage'
+import CommunitySelectPage from './CommunitySelectPage'
 import TimerApp from './TimerApp'
+import { isAdminUser } from './isAdmin'
 
 async function fetchProfile(userId) {
   const { data } = await supabase
@@ -59,5 +61,9 @@ export default function App() {
     return <DisplayNamePage user={user} onSaved={setProfile} />
   }
 
-  return <TimerApp user={user} profile={profile} />
+  if (!profile?.community_id) {
+    return <CommunitySelectPage user={user} profile={profile} onSaved={setProfile} />
+  }
+
+  return <TimerApp user={user} profile={profile} isAdmin={isAdminUser(user)} />
 }

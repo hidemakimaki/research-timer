@@ -4,6 +4,7 @@ import {
 } from 'recharts'
 import { supabase } from './supabaseClient'
 import LogView from './LogView'
+import AdminPage from './AdminPage'
 
 const POMODORO_WORK = 25 * 60
 const POMODORO_BREAK = 5 * 60
@@ -149,7 +150,7 @@ function RandomWord() {
   )
 }
 
-export default function TimerApp({ user, profile }) {
+export default function TimerApp({ user, profile, isAdmin = false }) {
   const [sessions, setSessions] = useState([])
   const [sessionsLoading, setSessionsLoading] = useState(true)
   const [localData, setLocalData] = useState(loadLocalSessions)
@@ -179,6 +180,7 @@ export default function TimerApp({ user, profile }) {
   const baseLeftRef = useRef(POMODORO_WORK) // pomodoro: seconds left at start of current run
   const sessionStartRef = useRef(null)
   const userIdRef = useRef(user.id)
+  const communityIdRef = useRef(profile?.community_id ?? null)
   const musicRef = useRef(null)
   const musicKeyRef = useRef('off')
   const pendingAlarmRef = useRef(null) // 'work' | 'break' | null — pending alarm to retry on visibility
@@ -208,6 +210,7 @@ export default function TimerApp({ user, profile }) {
       started_at: s.startedAt || new Date().toISOString(),
       duration: s.duration,
       mode: s.mode || 'free',
+      community_id: communityIdRef.current,
     }))
     const { error } = await supabase.from('sessions').insert(inserts)
     if (!error) {
@@ -315,6 +318,7 @@ export default function TimerApp({ user, profile }) {
         base_points: m.base,
         bonus_emoji: m.bonusEmoji,
         bonus_points: m.bonusPoints,
+        community_id: communityIdRef.current,
       })),
       { onConflict: 'user_id,date,level' }
     ).then(({ error }) => { if (error) console.warn('daily_points save failed:', error) })
@@ -363,6 +367,7 @@ export default function TimerApp({ user, profile }) {
             started_at: start.toISOString(),
             duration: POMODORO_WORK,
             mode: 'pomodoro',
+            community_id: communityIdRef.current,
           }).select().single().then(({ data }) => {
             if (data) setSessions(prev => [data, ...prev])
           })
@@ -445,11 +450,12 @@ export default function TimerApp({ user, profile }) {
       const { data } = await supabase
         .from('sessions')
         .insert({
-          user_id: user.id,
+          user_id: userIdRef.current,
           date: toDateStr(sessionStart || new Date()),
           started_at: (sessionStart || new Date()).toISOString(),
           duration: workSeconds,
           mode,
+          community_id: communityIdRef.current,
         })
         .select()
         .single()
@@ -635,9 +641,28 @@ export default function TimerApp({ user, profile }) {
         >
           ログ
         </button>
+        {isAdmin && (
+          <button
+            onClick={() => setView('admin')}
+            style={{
+              padding: '8px 20px',
+              borderRadius: 6,
+              border: 'none',
+              cursor: 'pointer',
+              background: view === 'admin' ? '#ee5a24' : '#e0e0e0',
+              color: view === 'admin' ? '#fff' : '#555',
+              fontWeight: 600,
+              fontSize: 14,
+              transition: 'background 0.2s',
+            }}
+          >
+            管理
+          </button>
+        )}
       </div>
 
-      {view === 'log' && <LogView sessions={sessions} legendaryHistory={legendaryHistory} totalPoints={totalPoints} displayName={profile?.display_name} />}
+      {view === 'log' && <LogView sessions={sessions} legendaryHistory={legendaryHistory} totalPoints={totalPoints} displayName={profile?.display_name} communityId={profile?.community_id ?? null} />}
+      {view === 'admin' && isAdmin && <AdminPage />}
 
       {view === 'timer' && <>
 
