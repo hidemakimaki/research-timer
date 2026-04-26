@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { supabase } from './supabaseClient'
+import { validateDisplayName } from './validateDisplayName'
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [displayName, setDisplayName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
@@ -19,7 +21,14 @@ export default function AuthPage() {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) setError(error.message)
     } else {
-      const { error } = await supabase.auth.signUp({ email, password })
+      const nameError = validateDisplayName(displayName)
+      if (nameError) { setError(nameError); setLoading(false); return }
+
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { display_name: displayName.trim() } },
+      })
       if (error) {
         setError(error.message)
       } else {
@@ -29,13 +38,17 @@ export default function AuthPage() {
     setLoading(false)
   }
 
+  const switchMode = () => {
+    setIsLogin(!isLogin)
+    setError('')
+    setMessage('')
+    setDisplayName('')
+  }
+
   return (
     <div style={{
       position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
+      top: 0, left: 0, right: 0, bottom: 0,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -57,10 +70,23 @@ export default function AuthPage() {
         </p>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {!isLogin && (
+            <div>
+              <label style={labelStyle}>表示名</label>
+              <input
+                type="text"
+                value={displayName}
+                onChange={e => setDisplayName(e.target.value)}
+                required
+                style={inputStyle}
+                placeholder="例: 研究者タロウ"
+                maxLength={25}
+              />
+              <p style={hintStyle}>3〜20文字・日本語英数字OK・絵文字2個まで</p>
+            </div>
+          )}
           <div>
-            <label style={{ fontSize: 13, fontWeight: 600, color: '#555', display: 'block', marginBottom: 5 }}>
-              メールアドレス
-            </label>
+            <label style={labelStyle}>メールアドレス</label>
             <input
               type="email"
               value={email}
@@ -71,9 +97,7 @@ export default function AuthPage() {
             />
           </div>
           <div>
-            <label style={{ fontSize: 13, fontWeight: 600, color: '#555', display: 'block', marginBottom: 5 }}>
-              パスワード
-            </label>
+            <label style={labelStyle}>パスワード</label>
             <input
               type="password"
               value={password}
@@ -119,7 +143,7 @@ export default function AuthPage() {
           {isLogin ? 'アカウントをお持ちでない方は' : 'すでにアカウントをお持ちの方は'}
           {' '}
           <button
-            onClick={() => { setIsLogin(!isLogin); setError(''); setMessage('') }}
+            onClick={switchMode}
             style={{ background: 'none', border: 'none', color: '#4f7cff', fontWeight: 600, cursor: 'pointer', fontSize: 13, padding: 0 }}
           >
             {isLogin ? '新規登録' : 'ログイン'}
@@ -128,6 +152,14 @@ export default function AuthPage() {
       </div>
     </div>
   )
+}
+
+const labelStyle = {
+  fontSize: 13,
+  fontWeight: 600,
+  color: '#555',
+  display: 'block',
+  marginBottom: 5,
 }
 
 const inputStyle = {
@@ -139,4 +171,10 @@ const inputStyle = {
   outline: 'none',
   boxSizing: 'border-box',
   transition: 'border-color 0.15s',
+}
+
+const hintStyle = {
+  fontSize: 11,
+  color: '#aaa',
+  margin: '4px 0 0',
 }

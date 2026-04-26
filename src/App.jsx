@@ -1,20 +1,36 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import AuthPage from './AuthPage'
+import DisplayNamePage from './DisplayNamePage'
 import TimerApp from './TimerApp'
 
 export default function App() {
   const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [profile, setProfile] = useState(null)
+  const [loading, setLoading] = useState(true) // true until first auth+profile check done
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null)
-      setLoading(false)
-    })
+    let initialized = false
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
-      setUser(session?.user ?? null)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      const u = session?.user ?? null
+      setUser(u)
+
+      if (u) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', u.id)
+          .maybeSingle()
+        setProfile(data ?? null)
+      } else {
+        setProfile(null)
+      }
+
+      if (!initialized) {
+        initialized = true
+        setLoading(false)
+      }
     })
 
     return () => subscription.unsubscribe()
@@ -30,5 +46,9 @@ export default function App() {
 
   if (!user) return <AuthPage />
 
-  return <TimerApp user={user} />
+  if (!profile?.display_name) {
+    return <DisplayNamePage user={user} onSaved={setProfile} />
+  }
+
+  return <TimerApp user={user} profile={profile} />
 }

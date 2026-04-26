@@ -149,7 +149,7 @@ function RandomWord() {
   )
 }
 
-export default function TimerApp({ user }) {
+export default function TimerApp({ user, profile }) {
   const [sessions, setSessions] = useState([])
   const [sessionsLoading, setSessionsLoading] = useState(true)
   const [localData, setLocalData] = useState(loadLocalSessions)
@@ -532,7 +532,7 @@ export default function TimerApp({ user }) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: '#222' }}>研究タイマー</h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ fontSize: 13, color: '#aaa' }}>{user.email}</span>
+          <span style={{ fontSize: 13, color: '#aaa' }}>{profile?.display_name || user.email}</span>
           <button
             onClick={handleLogout}
             style={{
