@@ -7,12 +7,16 @@ import TimerApp from './TimerApp'
 import { isAdminUser } from './isAdmin'
 
 async function fetchProfile(userId) {
-  const { data } = await supabase
+  // ネットワーク不調でハングしないよう5秒でタイムアウト
+  const timeout = new Promise(resolve => setTimeout(() => resolve(null), 5000))
+  const query = supabase
     .from('profiles')
     .select('*')
     .eq('id', userId)
     .maybeSingle()
-  return data ?? null
+    .then(({ data }) => data ?? null)
+    .catch(() => null)
+  return Promise.race([query, timeout])
 }
 
 export default function App() {
@@ -22,19 +26,20 @@ export default function App() {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // ログイン時はプロフィール取得完了まで読み込み中を表示
+      const u = session?.user ?? null
       if (event === 'SIGNED_IN') setLoading(true)
+      setUser(u)
+
+      if (!u) {
+        setProfile(null)
+        setLoading(false)
+        return
+      }
+
       try {
-        const u = session?.user ?? null
-        setUser(u)
-        if (u) {
-          const p = await fetchProfile(u.id)
-          setProfile(p)
-        } else {
-          setProfile(null)
-        }
+        const p = await fetchProfile(u.id)
+        setProfile(p)
       } finally {
-        // 初回起動・ログイン時のみローディング解除（TOKEN_REFRESHED等は除外）
         if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
           setLoading(false)
         }
