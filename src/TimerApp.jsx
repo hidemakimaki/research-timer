@@ -9,11 +9,37 @@ const POMODORO_WORK = 25 * 60
 const POMODORO_BREAK = 5 * 60
 const STORAGE_KEY = 'research-timer-sessions'
 const LEGENDARY_KEY = 'research-timer-legendary'
+const POINTS_KEY = 'research-timer-points'
 
 function loadLegendaryHistory() {
   try {
     return JSON.parse(localStorage.getItem(LEGENDARY_KEY) || '[]')
   } catch { return [] }
+}
+
+function loadPointsData() {
+  try { return JSON.parse(localStorage.getItem(POINTS_KEY) || '[]') }
+  catch { return [] }
+}
+
+// 50分ボーナス絵文字のロール
+function roll50Emoji() {
+  const r = Math.random() * 100
+  if (r < 20) return '🎁'
+  if (r < 50) return '⚡️'
+  return '🐤'
+}
+
+function get50Bonus(emoji) {
+  if (emoji === '🎁') return 3   // スーパーレア
+  if (emoji === '⚡️') return 2  // レア
+  return 1                        // ノーマル: 🐤
+}
+
+function get100Bonus(emoji) {
+  if (['🌟', '🌍'].includes(emoji)) return 5   // スーパーレア
+  if (['🦖', '🚀'].includes(emoji)) return 4   // レア
+  return 3                                       // ノーマル: 🌊, 🧸
 }
 
 const FAVORITE_WORDS = [
@@ -129,6 +155,12 @@ export default function TimerApp({ user }) {
   const [localData, setLocalData] = useState(loadLocalSessions)
   const [migrating, setMigrating] = useState(false)
   const [legendaryHistory, setLegendaryHistory] = useState(loadLegendaryHistory)
+  const [pointsData, setPointsData] = useState(loadPointsData)
+  const [fiftyEmoji, setFiftyEmoji] = useState(() => {
+    const todayStr = toDateStr(new Date())
+    return loadPointsData().find(r => r.date === todayStr)
+      ?.milestones?.find(m => m.level === 50)?.bonusEmoji || null
+  })
 
   const [mode, setMode] = useState('free')
   const [phase, setPhase] = useState('work')
@@ -150,6 +182,7 @@ export default function TimerApp({ user }) {
   const musicRef = useRef(null)
   const musicKeyRef = useRef('off')
   const pendingAlarmRef = useRef(null) // 'work' | 'break' | null — pending alarm to retry on visibility
+  const achievedRef = useRef(null)    // { [dateStr]: Set<'25'|'50'|'100'> } — prevents double-awarding
 
   // Load sessions from Supabase
   const fetchSessions = useCallback(async () => {
@@ -229,6 +262,56 @@ export default function TimerApp({ user }) {
       return updated
     })
   }, [isLegendary, legendaryEmoji])
+
+  // Award points when daily milestones are crossed (25 / 50 / 100 min)
+  useEffect(() => {
+    const todayStr = toDateStr(new Date())
+    // Lazy-init achievedRef from localStorage so page refreshes don't double-award
+    if (achievedRef.current === null) {
+      achievedRef.current = {}
+      loadPointsData().forEach(({ date, milestones }) => {
+        achievedRef.current[date] = new Set(milestones.map(m => String(m.level)))
+      })
+    }
+    if (!achievedRef.current[todayStr]) achievedRef.current[todayStr] = new Set()
+    const done = achievedRef.current[todayStr]
+    const newMilestones = []
+
+    if (todayTotal >= 25 * 60 && !done.has('25')) {
+      done.add('25')
+      newMilestones.push({ level: 25, base: 3, bonusEmoji: null, bonusPoints: 0 })
+    }
+    if (todayTotal >= 50 * 60 && !done.has('50')) {
+      done.add('50')
+      const emoji = roll50Emoji()
+      setFiftyEmoji(emoji)
+      newMilestones.push({ level: 50, base: 5, bonusEmoji: emoji, bonusPoints: get50Bonus(emoji) })
+    }
+    if (todayTotal >= 100 * 60 && !done.has('100') && legendaryEmoji) {
+      done.add('100')
+      newMilestones.push({ level: 100, base: 8, bonusEmoji: legendaryEmoji, bonusPoints: get100Bonus(legendaryEmoji) })
+    }
+
+    if (newMilestones.length === 0) return
+
+    setPointsData(prev => {
+      const idx = prev.findIndex(r => r.date === todayStr)
+      const updated = [...prev]
+      if (idx >= 0) {
+        updated[idx] = { ...updated[idx], milestones: [...updated[idx].milestones, ...newMilestones] }
+      } else {
+        updated.push({ date: todayStr, milestones: newMilestones })
+      }
+      localStorage.setItem(POINTS_KEY, JSON.stringify(updated))
+      return updated
+    })
+  }, [todayTotal, legendaryEmoji])
+
+  const totalPoints = useMemo(
+    () => pointsData.reduce((sum, { milestones }) =>
+      sum + milestones.reduce((s, m) => s + m.base + m.bonusPoints, 0), 0),
+    [pointsData]
+  )
 
   const clearInterval_ = useCallback(() => {
     if (intervalRef.current) {
@@ -541,7 +624,7 @@ export default function TimerApp({ user }) {
         </button>
       </div>
 
-      {view === 'log' && <LogView sessions={sessions} legendaryHistory={legendaryHistory} />}
+      {view === 'log' && <LogView sessions={sessions} legendaryHistory={legendaryHistory} totalPoints={totalPoints} />}
 
       {view === 'timer' && <>
 
@@ -554,7 +637,9 @@ export default function TimerApp({ user }) {
           color: '#444',
           letterSpacing: '0.04em',
         }}>
-          {milestone.label}{isLegendary ? ` ${legendaryEmoji}` : ''}
+          {milestone.label}
+          {isLegendary && legendaryEmoji && ` ${legendaryEmoji}`}
+          {!isLegendary && todayTotal >= 50 * 60 && fiftyEmoji && ` ${fiftyEmoji}`}
         </div>
       )}
 

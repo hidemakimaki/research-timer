@@ -17,7 +17,7 @@ function getMark(secs) {
   return null
 }
 
-export default function LogView({ sessions, legendaryHistory = [] }) {
+export default function LogView({ sessions, legendaryHistory = [], totalPoints = 0 }) {
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth())
@@ -153,6 +153,22 @@ export default function LogView({ sessions, legendaryHistory = [] }) {
 
       {/* Legendary Items */}
       {legendaryHistory.length > 0 && <LegendaryItems history={legendaryHistory} />}
+
+      {/* Research Points */}
+      <div style={{
+        background: '#fff',
+        borderRadius: 16,
+        padding: '20px 28px',
+        boxShadow: '0 2px 12px rgba(0,0,0,0.07)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+      }}>
+        <span style={{ fontSize: 15, color: '#666', fontWeight: 600 }}>研究ポイント</span>
+        <span style={{ fontSize: 28, fontWeight: 700, fontFamily: 'monospace', color: '#ff9800' }}>
+          {totalPoints}<span style={{ fontSize: 15, fontWeight: 500, color: '#aaa', marginLeft: 3 }}>点</span>
+        </span>
+      </div>
 
     </div>
   )
