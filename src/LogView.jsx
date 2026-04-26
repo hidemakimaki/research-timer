@@ -346,12 +346,13 @@ function SettingsCard({ user, profile, onProfileSaved }) {
 
   return (
     <div style={{
-      background: '#fff',
+      background: 'linear-gradient(135deg, #eef2ff 0%, #e8f4fd 100%)',
       borderRadius: 16,
       padding: '20px 24px',
-      boxShadow: '0 2px 12px rgba(0,0,0,0.07)',
+      boxShadow: '0 2px 12px rgba(79,124,255,0.10)',
+      border: '1.5px solid #c7d8fa',
     }}>
-      <h2 style={{ fontSize: 15, fontWeight: 700, color: '#444', marginBottom: 16 }}>設定</h2>
+      <h2 style={{ fontSize: 15, fontWeight: 700, color: '#3a5fc8', marginBottom: 16 }}>設定変更</h2>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div>
           <label style={settingsLabel}>表示名</label>
@@ -404,7 +405,7 @@ function SettingsCard({ user, profile, onProfileSaved }) {
             cursor: loading ? 'not-allowed' : 'pointer',
           }}
         >
-          {loading ? '保存中...' : '保存する'}
+          {loading ? '保存中...' : '設定を変更する'}
         </button>
       </form>
     </div>
