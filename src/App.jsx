@@ -22,15 +22,19 @@ export default function App() {
 
   useEffect(() => {
     // 初回: セッション確認 → プロフィール取得 → ローディング解除
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      const u = session?.user ?? null
-      setUser(u)
-      if (u) {
-        const p = await fetchProfile(u.id)
-        setProfile(p)
+    ;(async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        const u = session?.user ?? null
+        setUser(u)
+        if (u) {
+          const p = await fetchProfile(u.id)
+          setProfile(p)
+        }
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
-    })
+    })()
 
     // 以降の認証変化（ログイン・ログアウト）を監視
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
