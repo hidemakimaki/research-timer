@@ -7,8 +7,8 @@ import TimerApp from './TimerApp'
 import { isAdminUser } from './isAdmin'
 
 async function fetchProfile(userId) {
-  // getSession()でトークンが有効な状態で呼ばれるので3秒で十分
-  const timeout = new Promise(resolve => setTimeout(() => resolve(null), 3000))
+  // getSession()でトークンは保証済み。ネットワーク遅延に対応するため8秒確保
+  const timeout = new Promise(resolve => setTimeout(() => resolve(null), 8000))
   const query = supabase
     .from('profiles')
     .select('*')
