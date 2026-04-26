@@ -22,8 +22,19 @@ function getMark(secs) {
 export default function LogView({ sessions, legendaryHistory = [], totalPoints = 0, displayName = '', communityId = null, user = null, profile = null, onProfileSaved = null }) {
   const [weeklyRanking, setWeeklyRanking] = useState(null)  // null = loading
   const [monthlyRanking, setMonthlyRanking] = useState(null)
+  const [communities, setCommunities] = useState([])
 
   useEffect(() => {
+    supabase.from('communities').select('id, name').order('name').then(({ data }) => {
+      if (data) setCommunities(data)
+    })
+  }, [])
+
+  const currentCommunityName = communities.find(c => c.id === communityId)?.name ?? ''
+  const isPersonal = currentCommunityName === '個人使用'
+
+  useEffect(() => {
+    if (isPersonal) return
     Promise.all([
       supabase.rpc('get_ranking', { period: 'week', p_community_id: communityId }),
       supabase.rpc('get_ranking', { period: 'month', p_community_id: communityId }),
@@ -31,7 +42,7 @@ export default function LogView({ sessions, legendaryHistory = [], totalPoints =
       setWeeklyRanking(weekly.data || [])
       setMonthlyRanking(monthly.data || [])
     })
-  }, [communityId])
+  }, [communityId, isPersonal])
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth())
@@ -169,8 +180,8 @@ export default function LogView({ sessions, legendaryHistory = [], totalPoints =
       {legendaryHistory.length > 0 && <LegendaryItems history={legendaryHistory} />}
 
       {/* Rankings */}
-      <RankingCard title="週間ランキング" rows={weeklyRanking} myName={displayName} />
-      <RankingCard title="月間ランキング" rows={monthlyRanking} myName={displayName} />
+      {!isPersonal && <RankingCard title="週間ランキング" rows={weeklyRanking} myName={displayName} />}
+      {!isPersonal && <RankingCard title="月間ランキング" rows={monthlyRanking} myName={displayName} />}
 
       {/* Research Points */}
       <div style={{
@@ -190,7 +201,7 @@ export default function LogView({ sessions, legendaryHistory = [], totalPoints =
 
       {/* Settings */}
       {user && onProfileSaved && (
-        <SettingsCard user={user} profile={profile} onProfileSaved={onProfileSaved} />
+        <SettingsCard user={user} profile={profile} onProfileSaved={onProfileSaved} communities={communities} />
       )}
 
     </div>
@@ -308,19 +319,12 @@ const statCard = {
   textAlign: 'center',
 }
 
-function SettingsCard({ user, profile, onProfileSaved }) {
+function SettingsCard({ user, profile, onProfileSaved, communities }) {
   const [displayName, setDisplayName] = useState(profile?.display_name || '')
   const [communityId, setCommunityId] = useState(profile?.community_id || '')
-  const [communities, setCommunities] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
-
-  useEffect(() => {
-    supabase.from('communities').select('id, name').order('name').then(({ data }) => {
-      if (data) setCommunities(data)
-    })
-  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
