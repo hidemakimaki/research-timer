@@ -5,6 +5,7 @@ import {
 import { supabase } from './supabaseClient'
 import LogView from './LogView'
 import AdminPage from './AdminPage'
+import { validateDisplayName } from './validateDisplayName'
 
 const POMODORO_WORK = 25 * 60
 const POMODORO_BREAK = 5 * 60
@@ -641,6 +642,22 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
         >
           ログ
         </button>
+        <button
+          onClick={() => setView('settings')}
+          style={{
+            padding: '8px 20px',
+            borderRadius: 6,
+            border: 'none',
+            cursor: 'pointer',
+            background: view === 'settings' ? '#4f7cff' : '#e0e0e0',
+            color: view === 'settings' ? '#fff' : '#555',
+            fontWeight: 600,
+            fontSize: 14,
+            transition: 'background 0.2s',
+          }}
+        >
+          設定
+        </button>
         {isAdmin && (
           <button
             onClick={() => setView('admin')}
@@ -661,7 +678,8 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
         )}
       </div>
 
-      {view === 'log' && <LogView sessions={sessions} legendaryHistory={legendaryHistory} totalPoints={totalPoints} displayName={profile?.display_name} communityId={profile?.community_id ?? null} user={user} profile={profile} onProfileSaved={onProfileChange} />}
+      {view === 'log' && <LogView sessions={sessions} legendaryHistory={legendaryHistory} totalPoints={totalPoints} displayName={profile?.display_name} communityId={profile?.community_id ?? null} />}
+      {view === 'settings' && <SettingsCard user={user} profile={profile} onProfileSaved={onProfileChange} />}
       {view === 'admin' && isAdmin && <AdminPage />}
 
       {view === 'timer' && <>
@@ -896,6 +914,128 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
       </>}
     </div>
   )
+}
+
+function SettingsCard({ user, profile, onProfileSaved }) {
+  const [displayName, setDisplayName] = useState(profile?.display_name || '')
+  const [communityId, setCommunityId] = useState(profile?.community_id || '')
+  const [communities, setCommunities] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState(false)
+
+  useEffect(() => {
+    supabase.from('communities').select('id, name').order('name').then(({ data }) => {
+      if (data) setCommunities(data)
+    })
+  }, [])
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setError('')
+    setSuccess(false)
+    const nameError = validateDisplayName(displayName)
+    if (nameError) { setError(nameError); return }
+    if (!communityId) { setError('コミュニティを選択してください'); return }
+    setLoading(true)
+    const { data, error: dbError } = await supabase
+      .from('profiles')
+      .upsert({ id: user.id, display_name: displayName.trim(), community_id: communityId, updated_at: new Date().toISOString() })
+      .select()
+      .single()
+    if (dbError) {
+      setError('保存に失敗しました。再度お試しください。')
+    } else {
+      onProfileSaved(data)
+      setSuccess(true)
+    }
+    setLoading(false)
+  }
+
+  return (
+    <div style={{
+      background: 'linear-gradient(135deg, #eef2ff 0%, #e8f4fd 100%)',
+      borderRadius: 16,
+      padding: '20px 24px',
+      boxShadow: '0 2px 12px rgba(79,124,255,0.10)',
+      border: '1.5px solid #c7d8fa',
+    }}>
+      <h2 style={{ fontSize: 15, fontWeight: 700, color: '#3a5fc8', marginBottom: 16 }}>設定変更</h2>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div>
+          <label style={settingsLabel}>表示名</label>
+          <input
+            type="text"
+            value={displayName}
+            onChange={e => { setDisplayName(e.target.value); setSuccess(false) }}
+            required
+            style={settingsInput}
+            placeholder="例: 研究者タロウ"
+            maxLength={25}
+          />
+          <p style={{ fontSize: 11, color: '#aaa', margin: '4px 0 0' }}>3〜20文字・日本語英数字OK・絵文字2個まで</p>
+        </div>
+        <div>
+          <label style={settingsLabel}>コミュニティ</label>
+          <select
+            value={communityId}
+            onChange={e => { setCommunityId(e.target.value); setSuccess(false) }}
+            required
+            style={{ ...settingsInput, color: communityId ? '#333' : '#aaa' }}
+          >
+            <option value="">選択してください</option>
+            {communities.map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        </div>
+        {error && (
+          <p style={{ fontSize: 13, color: '#ee5a24', background: '#fff5f2', borderRadius: 6, padding: '8px 12px', margin: 0 }}>
+            {error}
+          </p>
+        )}
+        {success && (
+          <p style={{ fontSize: 13, color: '#34c97e', background: '#f0fdf8', borderRadius: 6, padding: '8px 12px', margin: 0 }}>
+            保存しました
+          </p>
+        )}
+        <button
+          type="submit"
+          disabled={loading}
+          style={{
+            padding: '11px 0',
+            background: loading ? '#a0b4ff' : '#4f7cff',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 8,
+            fontWeight: 700,
+            fontSize: 15,
+            cursor: loading ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {loading ? '保存中...' : '設定を変更する'}
+        </button>
+      </form>
+    </div>
+  )
+}
+
+const settingsLabel = {
+  fontSize: 13,
+  fontWeight: 600,
+  color: '#555',
+  display: 'block',
+  marginBottom: 5,
+}
+
+const settingsInput = {
+  width: '100%',
+  padding: '10px 12px',
+  border: '1.5px solid #e0e0e0',
+  borderRadius: 8,
+  fontSize: 14,
+  outline: 'none',
+  boxSizing: 'border-box',
 }
 
 function Btn({ children, onClick, color, outline }) {
