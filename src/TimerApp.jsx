@@ -305,6 +305,19 @@ export default function TimerApp({ user, profile }) {
       localStorage.setItem(POINTS_KEY, JSON.stringify(updated))
       return updated
     })
+
+    // Supabase にも保存してランキングへ反映（失敗しても動作に影響しない）
+    supabase.from('daily_points').upsert(
+      newMilestones.map(m => ({
+        user_id: userIdRef.current,
+        date: todayStr,
+        level: m.level,
+        base_points: m.base,
+        bonus_emoji: m.bonusEmoji,
+        bonus_points: m.bonusPoints,
+      })),
+      { onConflict: 'user_id,date,level' }
+    ).then(({ error }) => { if (error) console.warn('daily_points save failed:', error) })
   }, [todayTotal, legendaryEmoji])
 
   const totalPoints = useMemo(
@@ -624,7 +637,7 @@ export default function TimerApp({ user, profile }) {
         </button>
       </div>
 
-      {view === 'log' && <LogView sessions={sessions} legendaryHistory={legendaryHistory} totalPoints={totalPoints} />}
+      {view === 'log' && <LogView sessions={sessions} legendaryHistory={legendaryHistory} totalPoints={totalPoints} displayName={profile?.display_name} />}
 
       {view === 'timer' && <>
 

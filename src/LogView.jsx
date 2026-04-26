@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { supabase } from './supabaseClient'
 
 const MONTH_NAMES = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月']
 const DOW = ['日','月','火','水','木','金','土']
@@ -17,7 +18,19 @@ function getMark(secs) {
   return null
 }
 
-export default function LogView({ sessions, legendaryHistory = [], totalPoints = 0 }) {
+export default function LogView({ sessions, legendaryHistory = [], totalPoints = 0, displayName = '' }) {
+  const [weeklyRanking, setWeeklyRanking] = useState(null)  // null = loading
+  const [monthlyRanking, setMonthlyRanking] = useState(null)
+
+  useEffect(() => {
+    Promise.all([
+      supabase.rpc('get_ranking', { period: 'week' }),
+      supabase.rpc('get_ranking', { period: 'month' }),
+    ]).then(([weekly, monthly]) => {
+      setWeeklyRanking(weekly.data || [])
+      setMonthlyRanking(monthly.data || [])
+    })
+  }, [])
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth())
@@ -154,6 +167,10 @@ export default function LogView({ sessions, legendaryHistory = [], totalPoints =
       {/* Legendary Items */}
       {legendaryHistory.length > 0 && <LegendaryItems history={legendaryHistory} />}
 
+      {/* Rankings */}
+      <RankingCard title="週間ランキング" rows={weeklyRanking} myName={displayName} />
+      <RankingCard title="月間ランキング" rows={monthlyRanking} myName={displayName} />
+
       {/* Research Points */}
       <div style={{
         background: '#fff',
@@ -216,6 +233,52 @@ function LegendaryItems({ history }) {
           </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+const RANK_MEDALS = ['🥇', '🥈', '🥉']
+
+function RankingCard({ title, rows, myName }) {
+  return (
+    <div style={{
+      background: '#fff',
+      borderRadius: 16,
+      padding: '20px 24px',
+      boxShadow: '0 2px 12px rgba(0,0,0,0.07)',
+    }}>
+      <h2 style={{ fontSize: 15, fontWeight: 700, color: '#444', marginBottom: 12 }}>{title}</h2>
+      {rows === null ? (
+        <p style={{ fontSize: 13, color: '#bbb', margin: 0 }}>読み込み中...</p>
+      ) : rows.length === 0 ? (
+        <p style={{ fontSize: 13, color: '#bbb', margin: 0 }}>まだデータがありません</p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          {rows.map(r => {
+            const isMe = r.display_name === myName
+            const medal = RANK_MEDALS[r.rank - 1] || `${r.rank}位`
+            return (
+              <div key={r.rank} style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '9px 10px',
+                borderRadius: 8,
+                background: isMe ? '#eef2ff' : 'transparent',
+                fontWeight: isMe ? 700 : 400,
+              }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: '#333' }}>
+                  <span style={{ minWidth: 28, fontSize: r.rank <= 3 ? 18 : 13, color: '#888' }}>{medal}</span>
+                  <span>{r.display_name}{isMe && ' 👈'}</span>
+                </span>
+                <span style={{ fontSize: 14, fontFamily: 'monospace', color: '#4f7cff', fontWeight: 700 }}>
+                  {Number(r.total_points)}点
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
