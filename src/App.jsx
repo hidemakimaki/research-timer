@@ -86,5 +86,5 @@ export default function App() {
     return <CommunitySelectPage user={user} profile={profile} onSaved={setProfile} />
   }
 
-  return <TimerApp user={user} profile={profile} isAdmin={isAdminUser(user)} />
+  return <TimerApp user={user} profile={profile} isAdmin={isAdminUser(user)} onProfileChange={setProfile} />
 }

@@ -150,7 +150,7 @@ function RandomWord() {
   )
 }
 
-export default function TimerApp({ user, profile, isAdmin = false }) {
+export default function TimerApp({ user, profile, isAdmin = false, onProfileChange }) {
   const [sessions, setSessions] = useState([])
   const [sessionsLoading, setSessionsLoading] = useState(true)
   const [localData, setLocalData] = useState(loadLocalSessions)
@@ -661,7 +661,7 @@ export default function TimerApp({ user, profile, isAdmin = false }) {
         )}
       </div>
 
-      {view === 'log' && <LogView sessions={sessions} legendaryHistory={legendaryHistory} totalPoints={totalPoints} displayName={profile?.display_name} communityId={profile?.community_id ?? null} />}
+      {view === 'log' && <LogView sessions={sessions} legendaryHistory={legendaryHistory} totalPoints={totalPoints} displayName={profile?.display_name} communityId={profile?.community_id ?? null} user={user} profile={profile} onProfileSaved={onProfileChange} />}
       {view === 'admin' && isAdmin && <AdminPage />}
 
       {view === 'timer' && <>
