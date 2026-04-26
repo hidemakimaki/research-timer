@@ -1,14 +1,11 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import AuthPage from './AuthPage'
-import DisplayNamePage from './DisplayNamePage'
-import CommunitySelectPage from './CommunitySelectPage'
 import TimerApp from './TimerApp'
 import { isAdminUser } from './isAdmin'
 
 async function fetchProfile(userId) {
-  // getSession()でトークンは保証済み。ネットワーク遅延に対応するため8秒確保
-  const timeout = new Promise(resolve => setTimeout(() => resolve(null), 8000))
+  const timeout = new Promise(resolve => setTimeout(() => resolve(null), 3000))
   const query = supabase
     .from('profiles')
     .select('*')
@@ -77,14 +74,6 @@ export default function App() {
   }
 
   if (!user) return <AuthPage />
-
-  if (!profile?.display_name) {
-    return <DisplayNamePage user={user} onSaved={setProfile} />
-  }
-
-  if (!profile?.community_id) {
-    return <CommunitySelectPage user={user} profile={profile} onSaved={setProfile} />
-  }
 
   return <TimerApp user={user} profile={profile} isAdmin={isAdminUser(user)} onProfileChange={setProfile} />
 }
