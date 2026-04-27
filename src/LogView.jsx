@@ -222,7 +222,7 @@ export default function LogView({ sessions, legendaryHistory = [], totalPoints =
           </div>
         ))}
         <div style={{ fontSize: 12, color: '#a1887f', borderTop: '1px solid #ffe0b2', paddingTop: 8, marginTop: 2 }}>
-          1日最大 <strong style={{ color: '#e65100' }}>16点</strong> 獲得可能 ✨ ガチャのレアリティは運次第！
+          1日最大 <strong style={{ color: '#e65100' }}>16点</strong> 獲得可能 ✨ ガチャのレアリティは運次第
         </div>
       </div>
 
