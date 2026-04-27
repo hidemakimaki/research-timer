@@ -1079,7 +1079,7 @@ function PostCard({ user, profile }) {
       boxShadow: '0 2px 12px rgba(0,0,0,0.07)',
     }}>
       <h2 style={{ fontSize: 15, fontWeight: 700, color: '#444', marginBottom: 8 }}>ポスト</h2>
-      <p style={{ fontSize: 13, color: '#888', marginBottom: 16 }}>アプリに対するご意見を自由にどうぞ。</p>
+      <p style={{ fontSize: 13, color: '#888', marginBottom: 16 }}>アプリに対するご意見を自由にどうぞ。漫画や偉人の名言も募集します。</p>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <textarea
           value={content}
