@@ -8,14 +8,17 @@ export default function AdminPage() {
   const [allUsers, setAllUsers] = useState(null)
   const [rankings, setRankings] = useState({})
   const [selectedPeriod, setSelectedPeriod] = useState('week')
+  const [posts, setPosts] = useState(null)
 
   useEffect(() => {
     Promise.all([
       supabase.rpc('get_community_stats'),
       supabase.rpc('get_all_users_points'),
-    ]).then(([statsRes, usersRes]) => {
+      supabase.rpc('get_all_posts'),
+    ]).then(([statsRes, usersRes, postsRes]) => {
       setStats(statsRes.data || [])
       setAllUsers(usersRes.data || [])
+      setPosts(postsRes.data || [])
     })
   }, [])
 
@@ -185,6 +188,44 @@ export default function AdminPage() {
           )}
         </div>
       </div>
+      {/* Posts */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <h3 style={{ fontSize: 14, fontWeight: 700, color: '#666', margin: 0 }}>ユーザー投稿一覧</h3>
+        <div style={{
+          background: '#fff',
+          borderRadius: 12,
+          padding: '16px 20px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+        }}>
+          {posts === null ? (
+            <p style={{ fontSize: 13, color: '#bbb', margin: 0 }}>読み込み中...</p>
+          ) : posts.length === 0 ? (
+            <p style={{ fontSize: 13, color: '#bbb', margin: 0 }}>投稿なし</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+              {posts.map((p, i) => (
+                <div key={p.id} style={{
+                  padding: '12px 0',
+                  borderBottom: i < posts.length - 1 ? '1px solid #f5f5f5' : 'none',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#333' }}>
+                      {p.display_name || '（名前なし）'}
+                    </span>
+                    <span style={{ fontSize: 11, color: '#bbb' }}>
+                      {new Date(p.created_at).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                  <p style={{ fontSize: 13, color: '#555', margin: 0, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                    {p.content}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
     </div>
   )
 }
