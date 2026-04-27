@@ -8,16 +8,19 @@ export default function AuthPage() {
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [communityId, setCommunityId] = useState('')
+  const [joinPassword, setJoinPassword] = useState('')
   const [communities, setCommunities] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
 
   useEffect(() => {
-    supabase.from('communities').select('id, name').order('name').then(({ data }) => {
+    supabase.from('communities').select('id, name, requires_password').order('name').then(({ data }) => {
       if (data) setCommunities(data)
     })
   }, [])
+
+  const selectedCommunity = communities.find(c => c.id === communityId)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -32,6 +35,14 @@ export default function AuthPage() {
       const nameError = validateDisplayName(displayName)
       if (nameError) { setError(nameError); setLoading(false); return }
       if (!communityId) { setError('コミュニティを選択してください'); setLoading(false); return }
+
+      if (selectedCommunity?.requires_password) {
+        const { data: valid } = await supabase.rpc('verify_community_password', {
+          p_community_id: communityId,
+          p_password: joinPassword,
+        })
+        if (!valid) { setError('コミュニティのパスワードが正しくありません'); setLoading(false); return }
+      }
 
       const { error } = await supabase.auth.signUp({
         email,
@@ -53,6 +64,7 @@ export default function AuthPage() {
     setMessage('')
     setDisplayName('')
     setCommunityId('')
+    setJoinPassword('')
   }
 
   return (
@@ -99,7 +111,7 @@ export default function AuthPage() {
                 <label style={labelStyle}>コミュニティ</label>
                 <select
                   value={communityId}
-                  onChange={e => setCommunityId(e.target.value)}
+                  onChange={e => { setCommunityId(e.target.value); setJoinPassword('') }}
                   required
                   style={{ ...inputStyle, color: communityId ? '#333' : '#aaa' }}
                 >
@@ -109,6 +121,19 @@ export default function AuthPage() {
                   ))}
                 </select>
               </div>
+              {selectedCommunity?.requires_password && (
+                <div>
+                  <label style={labelStyle}>コミュニティパスワード</label>
+                  <input
+                    type="password"
+                    value={joinPassword}
+                    onChange={e => setJoinPassword(e.target.value)}
+                    required
+                    style={inputStyle}
+                    placeholder="パスワードを入力"
+                  />
+                </div>
+              )}
             </>
           )}
           <div>

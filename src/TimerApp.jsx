@@ -924,16 +924,20 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
 function SettingsCard({ user, profile, onProfileSaved }) {
   const [displayName, setDisplayName] = useState(profile?.display_name || '')
   const [communityId, setCommunityId] = useState(profile?.community_id || '')
+  const [joinPassword, setJoinPassword] = useState('')
   const [communities, setCommunities] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
 
   useEffect(() => {
-    supabase.from('communities').select('id, name').order('name').then(({ data }) => {
+    supabase.from('communities').select('id, name, requires_password').order('name').then(({ data }) => {
       if (data) setCommunities(data)
     })
   }, [])
+
+  const selectedCommunity = communities.find(c => c.id === communityId)
+  const isChangingCommunity = communityId !== (profile?.community_id || '')
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -942,6 +946,15 @@ function SettingsCard({ user, profile, onProfileSaved }) {
     const nameError = validateDisplayName(displayName)
     if (nameError) { setError(nameError); return }
     if (!communityId) { setError('コミュニティを選択してください'); return }
+
+    if (isChangingCommunity && selectedCommunity?.requires_password) {
+      const { data: valid } = await supabase.rpc('verify_community_password', {
+        p_community_id: communityId,
+        p_password: joinPassword,
+      })
+      if (!valid) { setError('コミュニティのパスワードが正しくありません'); return }
+    }
+
     setLoading(true)
     const { data, error: dbError } = await supabase
       .from('profiles')
@@ -953,6 +966,7 @@ function SettingsCard({ user, profile, onProfileSaved }) {
     } else {
       onProfileSaved(data)
       setSuccess(true)
+      setJoinPassword('')
     }
     setLoading(false)
   }
@@ -984,7 +998,7 @@ function SettingsCard({ user, profile, onProfileSaved }) {
           <label style={settingsLabel}>コミュニティ</label>
           <select
             value={communityId}
-            onChange={e => { setCommunityId(e.target.value); setSuccess(false) }}
+            onChange={e => { setCommunityId(e.target.value); setJoinPassword(''); setSuccess(false) }}
             required
             style={{ ...settingsInput, color: communityId ? '#333' : '#aaa' }}
           >
@@ -994,6 +1008,19 @@ function SettingsCard({ user, profile, onProfileSaved }) {
             ))}
           </select>
         </div>
+        {isChangingCommunity && selectedCommunity?.requires_password && (
+          <div>
+            <label style={settingsLabel}>コミュニティパスワード</label>
+            <input
+              type="password"
+              value={joinPassword}
+              onChange={e => { setJoinPassword(e.target.value); setSuccess(false) }}
+              required
+              style={settingsInput}
+              placeholder="パスワードを入力"
+            />
+          </div>
+        )}
         {error && (
           <p style={{ fontSize: 13, color: '#ee5a24', background: '#fff5f2', borderRadius: 6, padding: '8px 12px', margin: 0 }}>
             {error}
