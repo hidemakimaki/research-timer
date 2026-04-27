@@ -198,6 +198,34 @@ export default function LogView({ sessions, legendaryHistory = [], totalPoints =
         </span>
       </div>
 
+      {/* Points Guide */}
+      <div style={{
+        background: 'linear-gradient(135deg, #fffde7 0%, #fff8e1 100%)',
+        border: '1.5px solid #ffe082',
+        borderRadius: 16,
+        padding: '16px 20px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 10,
+      }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#f57f17', marginBottom: 2 }}>🎮 ポイントの入り方</div>
+        {[
+          { time: '25分', base: '+3点', bonus: null,            label: 'Good!' },
+          { time: '50分', base: '+2点', bonus: 'ガチャ +1〜3点', label: 'Great work!' },
+          { time: '100分', base: '+3点', bonus: 'ガチャ +3〜5点', label: 'Legendary!' },
+        ].map(({ time, base, bonus, label }) => (
+          <div key={time} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', background: '#ffb300', borderRadius: 6, padding: '2px 8px', minWidth: 36, textAlign: 'center' }}>{time}</span>
+            <span style={{ fontSize: 13, color: '#555' }}>{label}</span>
+            <span style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 700, color: '#e65100', fontFamily: 'monospace' }}>{base}</span>
+            {bonus && <span style={{ fontSize: 12, color: '#ff8f00' }}>＋{bonus}</span>}
+          </div>
+        ))}
+        <div style={{ fontSize: 12, color: '#a1887f', borderTop: '1px solid #ffe0b2', paddingTop: 8, marginTop: 2 }}>
+          1日最大 <strong style={{ color: '#e65100' }}>16点</strong> 獲得可能 ✨ ガチャのレアリティは運次第！
+        </div>
+      </div>
+
     </div>
   )
 }
