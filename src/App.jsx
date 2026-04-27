@@ -5,13 +5,15 @@ import TimerApp from './TimerApp'
 import { isAdminUser } from './isAdmin'
 
 async function fetchProfile(userId) {
-  return supabase
+  const timeout = new Promise(resolve => setTimeout(() => resolve(null), 8000))
+  const query = supabase
     .from('profiles')
     .select('*')
     .eq('id', userId)
     .maybeSingle()
     .then(({ data }) => data ?? null)
     .catch(() => null)
+  return Promise.race([query, timeout])
 }
 
 export default function App() {
