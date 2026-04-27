@@ -679,7 +679,12 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
       </div>
 
       {view === 'log' && <LogView sessions={sessions} legendaryHistory={legendaryHistory} totalPoints={totalPoints} displayName={profile?.display_name} communityId={profile?.community_id ?? null} />}
-      {view === 'settings' && <SettingsCard user={user} profile={profile} onProfileSaved={onProfileChange} />}
+      {view === 'settings' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <SettingsCard user={user} profile={profile} onProfileSaved={onProfileChange} />
+          <PostCard user={user} profile={profile} />
+        </div>
+      )}
       {view === 'admin' && isAdmin && <AdminPage />}
 
       {view === 'timer' && <>
@@ -1036,6 +1041,94 @@ const settingsInput = {
   fontSize: 14,
   outline: 'none',
   boxSizing: 'border-box',
+}
+
+function PostCard({ user, profile }) {
+  const [content, setContent] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState(false)
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!content.trim()) return
+    setError('')
+    setSuccess(false)
+    setLoading(true)
+    const { error: dbError } = await supabase
+      .from('posts')
+      .insert({
+        user_id: user.id,
+        display_name: profile?.display_name || null,
+        content: content.trim(),
+      })
+    if (dbError) {
+      setError('投稿に失敗しました。再度お試しください。')
+    } else {
+      setContent('')
+      setSuccess(true)
+    }
+    setLoading(false)
+  }
+
+  return (
+    <div style={{
+      background: '#fff',
+      borderRadius: 16,
+      padding: '20px 24px',
+      boxShadow: '0 2px 12px rgba(0,0,0,0.07)',
+    }}>
+      <h2 style={{ fontSize: 15, fontWeight: 700, color: '#444', marginBottom: 8 }}>ポスト</h2>
+      <p style={{ fontSize: 13, color: '#888', marginBottom: 16 }}>アプリに対するご意見を自由にどうぞ。</p>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <textarea
+          value={content}
+          onChange={e => { setContent(e.target.value); setSuccess(false) }}
+          rows={4}
+          maxLength={500}
+          placeholder="ご意見・ご要望をお書きください"
+          style={{
+            width: '100%',
+            padding: '10px 12px',
+            border: '1.5px solid #e0e0e0',
+            borderRadius: 8,
+            fontSize: 14,
+            outline: 'none',
+            resize: 'vertical',
+            boxSizing: 'border-box',
+            fontFamily: 'inherit',
+          }}
+        />
+        <span style={{ fontSize: 12, color: '#bbb', textAlign: 'right', marginTop: -8 }}>{content.length}/500</span>
+        {error && (
+          <p style={{ fontSize: 13, color: '#ee5a24', background: '#fff5f2', borderRadius: 6, padding: '8px 12px', margin: 0 }}>
+            {error}
+          </p>
+        )}
+        {success && (
+          <p style={{ fontSize: 13, color: '#34c97e', background: '#f0fdf8', borderRadius: 6, padding: '8px 12px', margin: 0 }}>
+            投稿しました。ありがとうございます！
+          </p>
+        )}
+        <button
+          type="submit"
+          disabled={loading || !content.trim()}
+          style={{
+            padding: '11px 0',
+            background: loading || !content.trim() ? '#c5d0f0' : '#4f7cff',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 8,
+            fontWeight: 700,
+            fontSize: 15,
+            cursor: loading || !content.trim() ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {loading ? '投稿中...' : '投稿する'}
+        </button>
+      </form>
+    </div>
+  )
 }
 
 function Btn({ children, onClick, color, outline }) {
