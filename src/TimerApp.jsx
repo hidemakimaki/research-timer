@@ -187,6 +187,25 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
   const pendingAlarmRef = useRef(null) // 'work' | 'break' | null — pending alarm to retry on visibility
   const achievedRef = useRef(null)    // { [dateStr]: Set<'25'|'50'|'100'> } — prevents double-awarding
 
+  // profileがnullのまま表示された場合にバックグラウンドで1回だけ再取得
+  useEffect(() => {
+    if (profile !== null) return
+    const timer = setTimeout(async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .maybeSingle()
+      if (data) onProfileChange(data)
+    }, 2000)
+    return () => clearTimeout(timer)
+  }, [profile, user.id, onProfileChange])
+
+  // communityIdRefをprofileの変化に追従させる
+  useEffect(() => {
+    communityIdRef.current = profile?.community_id ?? null
+  }, [profile])
+
   // Load sessions from Supabase
   const fetchSessions = useCallback(async () => {
     const { data } = await supabase
