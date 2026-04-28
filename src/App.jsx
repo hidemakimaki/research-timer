@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabaseClient'
 import AuthPage from './AuthPage'
 import TimerApp from './TimerApp'
-import CommunitySelectPage from './CommunitySelectPage'
 import { isAdminUser } from './isAdmin'
 
 async function fetchProfile(userId) {
@@ -89,11 +88,6 @@ export default function App() {
   }
 
   if (!user) return <AuthPage />
-
-  // 新規ユーザー：ログイン後にコミュニティ選択（認証済みなので一覧を取得可能）
-  if (!profile?.community_id) {
-    return <CommunitySelectPage user={user} profile={profile} onSaved={setProfile} />
-  }
 
   return <TimerApp user={user} profile={profile} isAdmin={isAdminUser(user)} onProfileChange={setProfile} />
 }
