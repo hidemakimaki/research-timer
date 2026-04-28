@@ -221,6 +221,9 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
     setSessionsLoading(false)
   }, [user.id])
 
+  const fetchSessionsRef = useRef(fetchSessions)
+  useEffect(() => { fetchSessionsRef.current = fetchSessions }, [fetchSessions])
+
   useEffect(() => { fetchSessions() }, [fetchSessions])
   useEffect(() => { sessionStartRef.current = sessionStart }, [sessionStart])
   useEffect(() => { statusRef.current = status }, [status])
@@ -462,8 +465,8 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
             duration: POMODORO_WORK,
             mode: 'pomodoro',
             community_id: communityIdRef.current,
-          }).select().single().then(({ data }) => {
-            if (data) setSessions(prev => [data, ...prev])
+          }).then(({ error }) => {
+            if (!error) fetchSessionsRef.current()
           })
           setPhase('break')
           setPomodoroLeft(POMODORO_BREAK)
@@ -541,7 +544,7 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
       : accumulatedWork + (phase === 'work' ? POMODORO_WORK - finalLeft : 0)
 
     if (workSeconds > 0) {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('sessions')
         .insert({
           user_id: userIdRef.current,
@@ -551,8 +554,6 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
           mode,
           community_id: communityIdRef.current,
         })
-        .select()
-        .single()
       if (error) {
         // Keep timer visible so user can retry — don't lose the recorded time
         baseElapsedRef.current = finalElapsed
@@ -561,7 +562,7 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
         setSaveError('保存に失敗しました。ネットワーク接続を確認して再度「終了」を押してください。')
         return
       }
-      if (data) setSessions(prev => [data, ...prev])
+      fetchSessionsRef.current()
     }
 
     setSaveError(null)
