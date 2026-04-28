@@ -463,7 +463,6 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
             started_at: start.toISOString(),
             duration: POMODORO_WORK,
             mode: 'pomodoro',
-            community_id: communityIdRef.current,
           }).then(({ error }) => {
             if (!error) fetchSessionsRef.current()
           })
@@ -553,7 +552,6 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
           started_at: sessionStartedAt,
           duration: workSeconds,
           mode,
-          community_id: communityIdRef.current,
         })
       if (error) {
         // Cloud save failed — fall back to localStorage so data is never lost
