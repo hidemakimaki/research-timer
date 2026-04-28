@@ -15,6 +15,7 @@ function getMark(secs) {
   if (secs >= 100 * 60) return 'legendary'
   if (secs >= 50 * 60) return 'great'
   if (secs >= 25 * 60) return 'good'
+  if (secs > 0) return 'any'
   return null
 }
 
@@ -160,6 +161,7 @@ export default function LogView({ sessions, legendaryHistory = [], totalPoints =
                     {mark === 'legendary' && '◎'}
                     {mark === 'great' && '◎'}
                     {mark === 'good' && '◯'}
+                    {mark === 'any' && <span style={{ fontSize: 18, color: '#ccc', lineHeight: 1 }}>·</span>}
                   </div>
                 </div>
               )
@@ -170,6 +172,7 @@ export default function LogView({ sessions, legendaryHistory = [], totalPoints =
 
       {/* Legend */}
       <div style={{ display: 'flex', gap: 16, justifyContent: 'center', fontSize: 12, color: '#888' }}>
+        <span style={{ color: '#ccc' }}>· 少し</span>
         <span>◯ 25分+</span>
         <span style={{ color: '#444' }}>◎ 50分+</span>
         <span style={{ color: '#4f7cff' }}>◎ 100分+</span>
