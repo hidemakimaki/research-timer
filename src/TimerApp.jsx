@@ -189,6 +189,7 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
   const musicKeyRef = useRef('off')
   const pendingAlarmRef = useRef(null) // 'work' | 'break' | null — pending alarm to retry on visibility
   const achievedRef = useRef(null)    // { [dateStr]: Set<'25'|'50'|'100'> } — prevents double-awarding
+  const statusRef = useRef('idle')
 
   // profileがnullのまま表示された場合にバックグラウンドで1回だけ再取得
   useEffect(() => {
@@ -222,6 +223,7 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
 
   useEffect(() => { fetchSessions() }, [fetchSessions])
   useEffect(() => { sessionStartRef.current = sessionStart }, [sessionStart])
+  useEffect(() => { statusRef.current = status }, [status])
 
   // Restore timer state from localStorage on mount (survives page refresh / accidental close)
   useEffect(() => {
@@ -250,8 +252,16 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
       setPhase(saved.phase || 'work')
       setAccumulatedWork(saved.accumulatedWork || 0)
     }
-    setStatus('paused')
-    setRestored(true)
+
+    if (saved.status === 'running') {
+      // Was actively running when page was killed — auto-resume seamlessly
+      runStartRef.current = Date.now()
+      intervalRef.current = setInterval(() => tickRef.current(), 1000)
+      setStatus('running')
+    } else {
+      setStatus('paused')
+      setRestored(true)
+    }
   }, []) // mount only
 
   // Persist active timer state to localStorage every tick (survives refresh / crash)
@@ -620,6 +630,11 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
         if (pendingAlarmRef.current === 'work') playWorkChime()
         else if (pendingAlarmRef.current === 'break') playBreakChime()
         tickRef.current()
+        // Restart interval if iOS suspended and killed it while timer was running
+        // runStartRef is still the original value, so tick() computes correct elapsed
+        if (statusRef.current === 'running' && !intervalRef.current) {
+          intervalRef.current = setInterval(() => tickRef.current(), 1000)
+        }
       }
     }
     document.addEventListener('visibilitychange', handleVisibility)
