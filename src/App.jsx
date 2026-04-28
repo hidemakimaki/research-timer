@@ -64,9 +64,9 @@ export default function App() {
         currentUserIdRef.current = u?.id ?? null
         setUser(u)
         if (u) {
-          let p = await fetchProfile(u.id)
-          if (!p) p = await createDefaultProfile(u)
+          const p = await fetchProfile(u.id)
           if (mounted) setProfile(p)
+          if (!p) createDefaultProfile(u).then(np => { if (mounted && np) setProfile(np) }).catch(() => {})
         }
       } finally {
         if (mounted) setLoading(false)
@@ -85,9 +85,9 @@ export default function App() {
           // 新規ログイン: ローディングを出してプロフィール取得
           setLoading(true)
           try {
-            let p = await fetchProfile(u?.id)
-            if (!p) p = await createDefaultProfile(u)
+            const p = await fetchProfile(u?.id)
             if (mounted) setProfile(p)
+            if (!p) createDefaultProfile(u).then(np => { if (mounted && np) setProfile(np) }).catch(() => {})
           } finally {
             if (mounted) setLoading(false)
           }
