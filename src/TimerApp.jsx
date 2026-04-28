@@ -175,7 +175,6 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
   const [bgMusic, setBgMusic] = useState('off')
   const [view, setView] = useState('timer')
   const [alarmMessage, setAlarmMessage] = useState(null)
-  const [saveError, setSaveError] = useState(null)
   const [restored, setRestored] = useState(false)
 
   const intervalRef = useRef(null)
@@ -544,28 +543,30 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
       : accumulatedWork + (phase === 'work' ? POMODORO_WORK - finalLeft : 0)
 
     if (workSeconds > 0) {
+      const sessionDate = toDateStr(sessionStart || new Date())
+      const sessionStartedAt = (sessionStart || new Date()).toISOString()
       const { error } = await supabase
         .from('sessions')
         .insert({
           user_id: userIdRef.current,
-          date: toDateStr(sessionStart || new Date()),
-          started_at: (sessionStart || new Date()).toISOString(),
+          date: sessionDate,
+          started_at: sessionStartedAt,
           duration: workSeconds,
           mode,
           community_id: communityIdRef.current,
         })
       if (error) {
-        // Keep timer visible so user can retry — don't lose the recorded time
-        baseElapsedRef.current = finalElapsed
-        setElapsed(finalElapsed)
-        setStatus('paused')
-        setSaveError('保存に失敗しました。ネットワーク接続を確認して再度「終了」を押してください。')
-        return
+        // Cloud save failed — fall back to localStorage so data is never lost
+        // The migration banner will appear automatically for syncing later
+        const fallback = { date: sessionDate, startedAt: sessionStartedAt, duration: workSeconds, mode }
+        const updated = [fallback, ...loadLocalSessions()]
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
+        setLocalData(updated)
+      } else {
+        fetchSessionsRef.current()
       }
-      fetchSessionsRef.current()
     }
 
-    setSaveError(null)
     setRestored(false)
     pendingAlarmRef.current = null
     setAlarmMessage(null)
@@ -821,37 +822,6 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
               border: '1px solid #4f7cff',
               borderRadius: 6,
               color: '#4f7cff',
-              fontSize: 12,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            閉じる
-          </button>
-        </div>
-      )}
-
-      {/* Save Error Banner */}
-      {saveError && (
-        <div style={{
-          background: '#fff5f2',
-          border: '1.5px solid #ee5a24',
-          borderRadius: 10,
-          padding: '12px 18px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 12,
-        }}>
-          <span style={{ fontSize: 13, color: '#c0392b' }}>{saveError}</span>
-          <button
-            onClick={() => setSaveError(null)}
-            style={{
-              padding: '4px 12px',
-              background: 'transparent',
-              border: '1px solid #ee5a24',
-              borderRadius: 6,
-              color: '#ee5a24',
               fontSize: 12,
               cursor: 'pointer',
               whiteSpace: 'nowrap',
