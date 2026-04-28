@@ -16,6 +16,34 @@ async function fetchProfile(userId) {
   return Promise.race([query, timeout])
 }
 
+// 新規ユーザーを「個人使用」コミュニティに自動登録する
+// INSERT（upsertではない）を使い、既存プロフィールを上書きしない
+async function createDefaultProfile(user) {
+  const { data: community } = await supabase
+    .from('communities')
+    .select('id')
+    .eq('name', '個人使用')
+    .maybeSingle()
+  if (!community) return null
+
+  const displayName = user.user_metadata?.display_name?.trim() || ''
+  const row = {
+    id: user.id,
+    community_id: community.id,
+    updated_at: new Date().toISOString(),
+    ...(displayName && { display_name: displayName }),
+  }
+  const { data, error } = await supabase
+    .from('profiles')
+    .insert(row)
+    .select()
+    .single()
+
+  // 競合（既存レコードあり＝タイムアウトで null になっただけ）なら再取得
+  if (error) return await fetchProfile(user.id)
+  return data ?? null
+}
+
 export default function App() {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
@@ -36,7 +64,8 @@ export default function App() {
         currentUserIdRef.current = u?.id ?? null
         setUser(u)
         if (u) {
-          const p = await fetchProfile(u.id)
+          let p = await fetchProfile(u.id)
+          if (!p) p = await createDefaultProfile(u)
           if (mounted) setProfile(p)
         }
       } finally {
@@ -56,7 +85,8 @@ export default function App() {
           // 新規ログイン: ローディングを出してプロフィール取得
           setLoading(true)
           try {
-            const p = await fetchProfile(u?.id)
+            let p = await fetchProfile(u?.id)
+            if (!p) p = await createDefaultProfile(u)
             if (mounted) setProfile(p)
           } finally {
             if (mounted) setLoading(false)
