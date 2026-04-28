@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 
 export default function CommunitySelectPage({ user, profile, onSaved }) {
+  const displayName = profile?.display_name || user?.user_metadata?.display_name || ''
   const [communityId, setCommunityId] = useState('')
   const [communities, setCommunities] = useState([])
   const [loading, setLoading] = useState(false)
@@ -19,7 +20,7 @@ export default function CommunitySelectPage({ user, profile, onSaved }) {
     setLoading(true)
     const { data, error: dbError } = await supabase
       .from('profiles')
-      .upsert({ id: user.id, community_id: communityId, updated_at: new Date().toISOString() })
+      .upsert({ id: user.id, display_name: displayName, community_id: communityId, updated_at: new Date().toISOString() })
       .select()
       .single()
     if (dbError) {
@@ -55,7 +56,7 @@ export default function CommunitySelectPage({ user, profile, onSaved }) {
       }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: '#222', marginBottom: 4 }}>コミュニティを選択</h1>
         <p style={{ fontSize: 14, color: '#888', marginBottom: 28 }}>
-          {profile?.display_name} さん、所属コミュニティを設定してください
+          {displayName ? `${displayName} さん、` : ''}所属コミュニティを設定してください
         </p>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
