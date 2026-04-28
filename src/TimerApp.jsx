@@ -586,6 +586,24 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
     setAccumulatedWork(0)
   }, [status])
 
+  const handleDeleteSession = useCallback(async (sessionId) => {
+    const { error } = await supabase.from('sessions').delete().eq('id', sessionId)
+    if (!error) setSessions(prev => prev.filter(s => s.id !== sessionId))
+    return !error
+  }, [])
+
+  const handleAddManualSession = useCallback(async (date, minutes) => {
+    const { error } = await supabase.from('sessions').insert({
+      user_id: userIdRef.current,
+      date,
+      started_at: new Date().toISOString(),
+      duration: minutes * 60,
+      mode: 'manual',
+    })
+    if (!error) fetchSessionsRef.current()
+    return !error
+  }, [])
+
   const handleLogout = async () => {
     await supabase.auth.signOut()
   }
@@ -751,6 +769,22 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
           ログ
         </button>
         <button
+          onClick={() => setView('edit')}
+          style={{
+            padding: '8px 20px',
+            borderRadius: 6,
+            border: 'none',
+            cursor: 'pointer',
+            background: view === 'edit' ? '#4f7cff' : '#e0e0e0',
+            color: view === 'edit' ? '#fff' : '#555',
+            fontWeight: 600,
+            fontSize: 14,
+            transition: 'background 0.2s',
+          }}
+        >
+          編集
+        </button>
+        <button
           onClick={() => setView('settings')}
           style={{
             padding: '8px 20px',
@@ -787,6 +821,13 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
       </div>
 
       {view === 'log' && <LogView sessions={sessions} legendaryHistory={legendaryHistory} totalPoints={totalPoints} displayName={profile?.display_name} communityId={profile?.community_id ?? null} />}
+      {view === 'edit' && (
+        <EditCard
+          sessions={sessions}
+          onDelete={handleDeleteSession}
+          onAdd={handleAddManualSession}
+        />
+      )}
       {view === 'settings' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <SettingsCard user={user} profile={profile} onProfileSaved={onProfileChange} />
@@ -1043,7 +1084,7 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
                     background: s.mode === 'pomodoro' ? '#eef2ff' : '#f5f5f5',
                     color: s.mode === 'pomodoro' ? '#4f7cff' : '#888',
                   }}>
-                    {s.mode === 'pomodoro' ? 'ポモドーロ' : '自由'}
+                    {s.mode === 'pomodoro' ? 'ポモドーロ' : s.mode === 'manual' ? '手動' : '自由'}
                   </span>
                 </div>
                 <span style={{ fontWeight: 600, fontFamily: 'monospace', color: '#333' }}>
@@ -1320,4 +1361,199 @@ function Btn({ children, onClick, color, outline }) {
       {children}
     </button>
   )
+}
+
+function EditCard({ sessions, onDelete, onAdd }) {
+  const [confirmId, setConfirmId] = useState(null)
+  const [deleting, setDeleting] = useState(false)
+  const [manualDate, setManualDate] = useState(() => toDateStr(new Date()))
+  const [manualMin, setManualMin] = useState(10)
+  const [adding, setAdding] = useState(false)
+  const [addResult, setAddResult] = useState(null) // 'ok' | 'error' | null
+
+  const sorted = [...sessions].sort((a, b) =>
+    b.date !== a.date ? b.date.localeCompare(a.date)
+      : new Date(b.started_at) - new Date(a.started_at)
+  )
+
+  const handleDeleteConfirm = async () => {
+    setDeleting(true)
+    const ok = await onDelete(confirmId)
+    if (ok) setConfirmId(null)
+    setDeleting(false)
+  }
+
+  const handleAdd = async (e) => {
+    e.preventDefault()
+    setAdding(true)
+    setAddResult(null)
+    const ok = await onAdd(manualDate, manualMin)
+    setAddResult(ok ? 'ok' : 'error')
+    setAdding(false)
+    if (ok) setManualMin(10)
+  }
+
+  const modeLabel = (m) =>
+    m === 'pomodoro' ? 'ポモドーロ' : m === 'manual' ? '手動' : '自由'
+
+  const modeBg = (m) =>
+    m === 'pomodoro' ? '#eef2ff' : m === 'manual' ? '#f0fff4' : '#f5f5f5'
+
+  const modeColor = (m) =>
+    m === 'pomodoro' ? '#4f7cff' : m === 'manual' ? '#34c97e' : '#888'
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+      {/* Delete section */}
+      <div style={{
+        background: '#fff',
+        borderRadius: 16,
+        padding: '20px 24px',
+        boxShadow: '0 2px 12px rgba(0,0,0,0.07)',
+      }}>
+        <h2 style={{ fontSize: 15, fontWeight: 700, color: '#444', marginBottom: 4 }}>セッションを削除</h2>
+        <p style={{ fontSize: 12, color: '#aaa', marginBottom: 14 }}>長時間の誤記録などを削除できます</p>
+        {sorted.length === 0 ? (
+          <p style={{ fontSize: 13, color: '#bbb', margin: 0 }}>記録がありません</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {sorted.map(s => (
+              <div key={s.id} style={{
+                borderBottom: '1px solid #f5f5f5',
+                padding: '10px 0',
+              }}>
+                {confirmId === s.id ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                    <span style={{ fontSize: 13, color: '#ee5a24', fontWeight: 600 }}>
+                      {formatDate(s.date)}　{formatTime(s.duration)}　を削除しますか？
+                    </span>
+                    <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                      <button
+                        onClick={handleDeleteConfirm}
+                        disabled={deleting}
+                        style={{ padding: '5px 14px', background: '#ee5a24', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        {deleting ? '...' : '削除'}
+                      </button>
+                      <button
+                        onClick={() => setConfirmId(null)}
+                        style={{ padding: '5px 12px', background: '#f0f0f0', color: '#666', border: 'none', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}
+                      >
+                        戻る
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                      <span style={{ fontSize: 13, color: '#888' }}>{formatDate(s.date)}</span>
+                      <span style={{
+                        fontSize: 11, padding: '2px 8px', borderRadius: 10,
+                        background: modeBg(s.mode), color: modeColor(s.mode),
+                      }}>
+                        {modeLabel(s.mode)}
+                      </span>
+                      <span style={{ fontSize: 14, fontWeight: 600, fontFamily: 'monospace', color: '#333' }}>
+                        {formatTime(s.duration)}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => setConfirmId(s.id)}
+                      style={{ padding: '4px 12px', background: 'transparent', color: '#ccc', border: '1px solid #e8e8e8', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}
+                    >
+                      削除
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Add manual time */}
+      <div style={{
+        background: '#fff',
+        borderRadius: 16,
+        padding: '20px 24px',
+        boxShadow: '0 2px 12px rgba(0,0,0,0.07)',
+      }}>
+        <h2 style={{ fontSize: 15, fontWeight: 700, color: '#444', marginBottom: 4 }}>時間を手動追加</h2>
+        <p style={{ fontSize: 12, color: '#aaa', marginBottom: 16 }}>記録し忘れた時間を最大20分まで追加できます</p>
+        <form onSubmit={handleAdd} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <label style={editLabel}>日付</label>
+            <input
+              type="date"
+              value={manualDate}
+              max={toDateStr(new Date())}
+              onChange={e => { setManualDate(e.target.value); setAddResult(null) }}
+              required
+              style={editInput}
+            />
+          </div>
+          <div>
+            <label style={editLabel}>追加時間：<strong style={{ color: '#4f7cff' }}>{manualMin} 分</strong></label>
+            <input
+              type="range"
+              min={1}
+              max={20}
+              value={manualMin}
+              onChange={e => { setManualMin(Number(e.target.value)); setAddResult(null) }}
+              style={{ width: '100%', marginTop: 6 }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#bbb', marginTop: 2 }}>
+              <span>1分</span><span>20分</span>
+            </div>
+          </div>
+          {addResult === 'ok' && (
+            <p style={{ fontSize: 13, color: '#34c97e', background: '#f0fdf8', borderRadius: 6, padding: '8px 12px', margin: 0 }}>
+              追加しました
+            </p>
+          )}
+          {addResult === 'error' && (
+            <p style={{ fontSize: 13, color: '#ee5a24', background: '#fff5f2', borderRadius: 6, padding: '8px 12px', margin: 0 }}>
+              追加に失敗しました。再度お試しください。
+            </p>
+          )}
+          <button
+            type="submit"
+            disabled={adding}
+            style={{
+              padding: '11px 0',
+              background: adding ? '#a0b4ff' : '#4f7cff',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 8,
+              fontWeight: 700,
+              fontSize: 15,
+              cursor: adding ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {adding ? '追加中...' : '追加する'}
+          </button>
+        </form>
+      </div>
+
+    </div>
+  )
+}
+
+const editLabel = {
+  fontSize: 13,
+  fontWeight: 600,
+  color: '#555',
+  display: 'block',
+  marginBottom: 5,
+}
+
+const editInput = {
+  width: '100%',
+  padding: '10px 12px',
+  border: '1.5px solid #e0e0e0',
+  borderRadius: 8,
+  fontSize: 14,
+  outline: 'none',
+  boxSizing: 'border-box',
 }
