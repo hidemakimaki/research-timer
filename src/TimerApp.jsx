@@ -769,22 +769,6 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
           ログ
         </button>
         <button
-          onClick={() => setView('edit')}
-          style={{
-            padding: '8px 20px',
-            borderRadius: 6,
-            border: 'none',
-            cursor: 'pointer',
-            background: view === 'edit' ? '#4f7cff' : '#e0e0e0',
-            color: view === 'edit' ? '#fff' : '#555',
-            fontWeight: 600,
-            fontSize: 14,
-            transition: 'background 0.2s',
-          }}
-        >
-          編集
-        </button>
-        <button
           onClick={() => setView('settings')}
           style={{
             padding: '8px 20px',
@@ -821,17 +805,15 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
       </div>
 
       {view === 'log' && <LogView sessions={sessions} legendaryHistory={legendaryHistory} totalPoints={totalPoints} displayName={profile?.display_name} communityId={profile?.community_id ?? null} />}
-      {view === 'edit' && (
-        <EditCard
-          sessions={sessions}
-          onDelete={handleDeleteSession}
-          onAdd={handleAddManualSession}
-        />
-      )}
       {view === 'settings' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <SettingsCard user={user} profile={profile} onProfileSaved={onProfileChange} />
           <PostCard user={user} profile={profile} />
+          <EditCard
+            sessions={sessions}
+            onDelete={handleDeleteSession}
+            onAdd={handleAddManualSession}
+          />
         </div>
       )}
       {view === 'admin' && isAdmin && <AdminPage />}
