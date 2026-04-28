@@ -4,8 +4,22 @@ import AuthPage from './AuthPage'
 import TimerApp from './TimerApp'
 import { isAdminUser } from './isAdmin'
 
+const PROFILE_CACHE_KEY = 'research-timer-profile-v1'
+
+function loadCachedProfile() {
+  try { return JSON.parse(localStorage.getItem(PROFILE_CACHE_KEY) ?? 'null') }
+  catch { return null }
+}
+
+function saveCachedProfile(p) {
+  try {
+    if (p) localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(p))
+    else localStorage.removeItem(PROFILE_CACHE_KEY)
+  } catch {}
+}
+
 async function fetchProfile(userId) {
-  const timeout = new Promise(resolve => setTimeout(() => resolve(null), 8000))
+  const timeout = new Promise(resolve => setTimeout(() => resolve(null), 5000))
   const query = supabase
     .from('profiles')
     .select('*')
@@ -46,34 +60,54 @@ async function createDefaultProfile(user) {
 
 export default function App() {
   const [user, setUser] = useState(null)
-  const [profile, setProfile] = useState(null)
+  // キャッシュから即時復元 → 再訪問時はローディングなしで表示
+  const [profile, setProfile] = useState(loadCachedProfile)
   const [loading, setLoading] = useState(true)
-  // ログイン済みユーザーIDをrefで追跡し、トークンリフレッシュ時の誤検知を防ぐ
   const currentUserIdRef = useRef(null)
+
+  // プロフィール更新時はキャッシュも同時に保存
+  const handleProfileChange = (p) => {
+    setProfile(p)
+    saveCachedProfile(p)
+  }
 
   useEffect(() => {
     let mounted = true
 
-    // 初回: getSession()はトークンリフレッシュ完了を待ってから返すため
-    // 有効なトークンで fetchProfile を確実に呼べる
     ;(async () => {
+      // Step1: auth確認（高速・localStorage読み取り中心）
+      let u = null
       try {
         const { data: { session } } = await supabase.auth.getSession()
         if (!mounted) return
-        const u = session?.user ?? null
+        u = session?.user ?? null
         currentUserIdRef.current = u?.id ?? null
         setUser(u)
-        if (u) {
-          const p = await fetchProfile(u.id)
-          if (mounted) setProfile(p)
-          if (!p) createDefaultProfile(u).then(np => { if (mounted && np) setProfile(np) }).catch(() => {})
+        if (!u) {
+          // ログアウト状態 → キャッシュクリア
+          setProfile(null)
+          saveCachedProfile(null)
         }
       } finally {
+        // auth確認が終わり次第すぐ表示（プロフィール取得を待たない）
         if (mounted) setLoading(false)
+      }
+
+      // Step2: プロフィール取得（バックグラウンド・loading解除後に続行）
+      if (!u || !mounted) return
+      const p = await fetchProfile(u.id)
+      if (!mounted) return
+      if (p) {
+        setProfile(p)
+        saveCachedProfile(p)
+      } else if (!loadCachedProfile()) {
+        // キャッシュもなければ新規ユーザー → デフォルトプロフィール作成
+        createDefaultProfile(u).then(np => {
+          if (mounted && np) { setProfile(np); saveCachedProfile(np) }
+        }).catch(() => {})
       }
     })()
 
-    // ログイン・ログアウトのみ監視（INITIAL_SESSIONはgetSession()で処理済み）
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return
       if (event === 'SIGNED_IN') {
@@ -82,24 +116,30 @@ export default function App() {
         currentUserIdRef.current = u?.id ?? null
         setUser(u)
         if (isNewLogin) {
-          // 新規ログイン: ローディングを出してプロフィール取得
           setLoading(true)
           try {
             const p = await fetchProfile(u?.id)
-            if (mounted) setProfile(p)
-            if (!p) createDefaultProfile(u).then(np => { if (mounted && np) setProfile(np) }).catch(() => {})
+            if (mounted) {
+              if (p) { setProfile(p); saveCachedProfile(p) }
+              else if (!loadCachedProfile()) {
+                createDefaultProfile(u).then(np => {
+                  if (mounted && np) { setProfile(np); saveCachedProfile(np) }
+                }).catch(() => {})
+              }
+            }
           } finally {
             if (mounted) setLoading(false)
           }
         } else {
-          // トークンリフレッシュ: ローディングなし・nullでも既存profileを上書きしない
+          // トークンリフレッシュ: バックグラウンドで更新・nullで上書きしない
           const p = await fetchProfile(u?.id)
-          if (mounted && p) setProfile(p)
+          if (mounted && p) { setProfile(p); saveCachedProfile(p) }
         }
       } else if (event === 'SIGNED_OUT') {
         currentUserIdRef.current = null
         setUser(null)
         setProfile(null)
+        saveCachedProfile(null)
       }
     })
 
@@ -119,5 +159,5 @@ export default function App() {
 
   if (!user) return <AuthPage />
 
-  return <TimerApp user={user} profile={profile} isAdmin={isAdminUser(user)} onProfileChange={setProfile} />
+  return <TimerApp user={user} profile={profile} isAdmin={isAdminUser(user)} onProfileChange={handleProfileChange} />
 }
