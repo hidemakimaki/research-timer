@@ -12,6 +12,7 @@ const POMODORO_BREAK = 5 * 60
 const STORAGE_KEY = 'research-timer-sessions'
 const LEGENDARY_KEY = 'research-timer-legendary'
 const POINTS_KEY = 'research-timer-points'
+const ACTIVE_KEY = 'research-timer-active'
 
 function loadLegendaryHistory() {
   try {
@@ -174,6 +175,8 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
   const [bgMusic, setBgMusic] = useState('off')
   const [view, setView] = useState('timer')
   const [alarmMessage, setAlarmMessage] = useState(null)
+  const [saveError, setSaveError] = useState(null)
+  const [restored, setRestored] = useState(false)
 
   const intervalRef = useRef(null)
   const runStartRef = useRef(null)    // Date.now() when current run segment began
@@ -219,6 +222,67 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
 
   useEffect(() => { fetchSessions() }, [fetchSessions])
   useEffect(() => { sessionStartRef.current = sessionStart }, [sessionStart])
+
+  // Restore timer state from localStorage on mount (survives page refresh / accidental close)
+  useEffect(() => {
+    const saved = (() => {
+      try { return JSON.parse(localStorage.getItem(ACTIVE_KEY)) } catch { return null }
+    })()
+    if (!saved) return
+    // Discard saves older than 8 hours
+    if (saved.savedAt && Date.now() - saved.savedAt > 8 * 3600 * 1000) {
+      localStorage.removeItem(ACTIVE_KEY)
+      return
+    }
+    const timePassed = saved.status === 'running' && saved.savedAt
+      ? Math.floor((Date.now() - saved.savedAt) / 1000)
+      : 0
+    setMode(saved.mode || 'free')
+    if (saved.sessionStart) setSessionStart(new Date(saved.sessionStart))
+    if (saved.mode === 'free' || !saved.mode) {
+      const restoredElapsed = (saved.elapsed || 0) + timePassed
+      baseElapsedRef.current = restoredElapsed
+      setElapsed(restoredElapsed)
+    } else {
+      const restoredLeft = Math.max(0, (saved.pomodoroLeft ?? POMODORO_WORK) - timePassed)
+      baseLeftRef.current = restoredLeft
+      setPomodoroLeft(restoredLeft)
+      setPhase(saved.phase || 'work')
+      setAccumulatedWork(saved.accumulatedWork || 0)
+    }
+    setStatus('paused')
+    setRestored(true)
+  }, []) // mount only
+
+  // Persist active timer state to localStorage every tick (survives refresh / crash)
+  useEffect(() => {
+    if (status === 'idle') {
+      localStorage.removeItem(ACTIVE_KEY)
+      return
+    }
+    localStorage.setItem(ACTIVE_KEY, JSON.stringify({
+      mode,
+      status,
+      sessionStart: sessionStart?.toISOString() ?? null,
+      elapsed,
+      pomodoroLeft,
+      phase,
+      accumulatedWork,
+      savedAt: Date.now(),
+    }))
+  }, [status, mode, sessionStart, elapsed, pomodoroLeft, phase, accumulatedWork])
+
+  // Warn before unloading while timer is active
+  useEffect(() => {
+    const handler = (e) => {
+      if (status === 'running' || status === 'paused') {
+        e.preventDefault()
+        e.returnValue = ''
+      }
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [status])
 
   // Migrate localStorage data to Supabase
   const migrateLocalData = async () => {
@@ -467,7 +531,7 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
       : accumulatedWork + (phase === 'work' ? POMODORO_WORK - finalLeft : 0)
 
     if (workSeconds > 0) {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('sessions')
         .insert({
           user_id: userIdRef.current,
@@ -479,9 +543,19 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
         })
         .select()
         .single()
+      if (error) {
+        // Keep timer visible so user can retry — don't lose the recorded time
+        baseElapsedRef.current = finalElapsed
+        setElapsed(finalElapsed)
+        setStatus('paused')
+        setSaveError('保存に失敗しました。ネットワーク接続を確認して再度「終了」を押してください。')
+        return
+      }
       if (data) setSessions(prev => [data, ...prev])
     }
 
+    setSaveError(null)
+    setRestored(false)
     pendingAlarmRef.current = null
     setAlarmMessage(null)
     document.title = '研究タイマー'
@@ -707,6 +781,70 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
       {view === 'admin' && isAdmin && <AdminPage />}
 
       {view === 'timer' && <>
+
+      {/* Restore Banner */}
+      {restored && (
+        <div style={{
+          background: '#f0f4ff',
+          border: '1.5px solid #4f7cff',
+          borderRadius: 10,
+          padding: '12px 18px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+        }}>
+          <span style={{ fontSize: 13, color: '#3a5fc8' }}>
+            前回のセッションを復元しました。再開または終了してください。
+          </span>
+          <button
+            onClick={() => setRestored(false)}
+            style={{
+              padding: '4px 12px',
+              background: 'transparent',
+              border: '1px solid #4f7cff',
+              borderRadius: 6,
+              color: '#4f7cff',
+              fontSize: 12,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            閉じる
+          </button>
+        </div>
+      )}
+
+      {/* Save Error Banner */}
+      {saveError && (
+        <div style={{
+          background: '#fff5f2',
+          border: '1.5px solid #ee5a24',
+          borderRadius: 10,
+          padding: '12px 18px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+        }}>
+          <span style={{ fontSize: 13, color: '#c0392b' }}>{saveError}</span>
+          <button
+            onClick={() => setSaveError(null)}
+            style={{
+              padding: '4px 12px',
+              background: 'transparent',
+              border: '1px solid #ee5a24',
+              borderRadius: 6,
+              color: '#ee5a24',
+              fontSize: 12,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            閉じる
+          </button>
+        </div>
+      )}
 
       {/* Milestone label */}
       {milestone && (
