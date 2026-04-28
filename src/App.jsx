@@ -50,15 +50,22 @@ export default function App() {
       if (!mounted) return
       if (event === 'SIGNED_IN') {
         const u = session?.user ?? null
-        // 同一ユーザーのトークンリフレッシュ時はローディングを出さずバックグラウンドで更新
         const isNewLogin = currentUserIdRef.current === null || currentUserIdRef.current !== u?.id
         currentUserIdRef.current = u?.id ?? null
         setUser(u)
-        if (u) {
-          if (isNewLogin) setLoading(true)
-          const p = await fetchProfile(u.id)
-          if (mounted && p) setProfile(p)  // nullが返っても既存profileを維持
-          if (isNewLogin && mounted) setLoading(false)
+        if (isNewLogin) {
+          // 新規ログイン: ローディングを出してプロフィール取得
+          setLoading(true)
+          try {
+            const p = await fetchProfile(u?.id)
+            if (mounted) setProfile(p)
+          } finally {
+            if (mounted) setLoading(false)
+          }
+        } else {
+          // トークンリフレッシュ: ローディングなし・nullでも既存profileを上書きしない
+          const p = await fetchProfile(u?.id)
+          if (mounted && p) setProfile(p)
         }
       } else if (event === 'SIGNED_OUT') {
         currentUserIdRef.current = null

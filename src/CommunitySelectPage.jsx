@@ -5,14 +5,25 @@ export default function CommunitySelectPage({ user, profile, onSaved }) {
   const displayName = profile?.display_name || user?.user_metadata?.display_name || ''
   const [communityId, setCommunityId] = useState('')
   const [communities, setCommunities] = useState([])
+  const [communitiesLoading, setCommunitiesLoading] = useState(true)
+  const [communitiesError, setCommunitiesError] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    supabase.from('communities').select('id, name').order('name').then(({ data }) => {
-      if (data) setCommunities(data)
+  const loadCommunities = () => {
+    setCommunitiesLoading(true)
+    setCommunitiesError(false)
+    supabase.from('communities').select('id, name').order('name').then(({ data, error: e }) => {
+      if (data && data.length > 0) {
+        setCommunities(data)
+      } else {
+        setCommunitiesError(true)
+      }
+      setCommunitiesLoading(false)
     })
-  }, [])
+  }
+
+  useEffect(() => { loadCommunities() }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -64,17 +75,31 @@ export default function CommunitySelectPage({ user, profile, onSaved }) {
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
             <label style={labelStyle}>コミュニティ</label>
-            <select
-              value={communityId}
-              onChange={e => setCommunityId(e.target.value)}
-              required
-              style={{ ...inputStyle, color: communityId ? '#333' : '#aaa' }}
-            >
-              <option value="">選択してください</option>
-              {communities.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+            {communitiesLoading ? (
+              <p style={{ fontSize: 13, color: '#aaa', margin: '8px 0' }}>読み込み中...</p>
+            ) : communitiesError ? (
+              <div>
+                <p style={{ fontSize: 13, color: '#ee5a24', margin: '4px 0 8px' }}>
+                  コミュニティの取得に失敗しました
+                </p>
+                <button type="button" onClick={loadCommunities} style={{
+                  fontSize: 13, color: '#4f7cff', background: 'none', border: 'none',
+                  cursor: 'pointer', padding: 0, textDecoration: 'underline',
+                }}>再試行</button>
+              </div>
+            ) : (
+              <select
+                value={communityId}
+                onChange={e => setCommunityId(e.target.value)}
+                required
+                style={{ ...inputStyle, color: communityId ? '#333' : '#aaa' }}
+              >
+                <option value="">選択してください</option>
+                {communities.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            )}
           </div>
 
           {error && (
