@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabaseClient'
 import AuthPage from './AuthPage'
 import TimerApp from './TimerApp'
@@ -21,6 +21,8 @@ export default function App() {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  // ログイン済みユーザーIDをrefで追跡し、トークンリフレッシュ時の誤検知を防ぐ
+  const currentUserIdRef = useRef(null)
 
   useEffect(() => {
     let mounted = true
@@ -32,6 +34,7 @@ export default function App() {
         const { data: { session } } = await supabase.auth.getSession()
         if (!mounted) return
         const u = session?.user ?? null
+        currentUserIdRef.current = u?.id ?? null
         setUser(u)
         if (u) {
           const p = await fetchProfile(u.id)
@@ -46,15 +49,19 @@ export default function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return
       if (event === 'SIGNED_IN') {
-        setLoading(true)
         const u = session?.user ?? null
+        // 同一ユーザーのトークンリフレッシュ時はローディングを出さずバックグラウンドで更新
+        const isNewLogin = currentUserIdRef.current === null || currentUserIdRef.current !== u?.id
+        currentUserIdRef.current = u?.id ?? null
         setUser(u)
         if (u) {
+          if (isNewLogin) setLoading(true)
           const p = await fetchProfile(u.id)
-          if (mounted) setProfile(p)
+          if (mounted && p) setProfile(p)  // nullが返っても既存profileを維持
+          if (isNewLogin && mounted) setLoading(false)
         }
-        if (mounted) setLoading(false)
       } else if (event === 'SIGNED_OUT') {
+        currentUserIdRef.current = null
         setUser(null)
         setProfile(null)
       }

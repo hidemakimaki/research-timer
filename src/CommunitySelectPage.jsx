@@ -18,9 +18,11 @@ export default function CommunitySelectPage({ user, profile, onSaved }) {
     e.preventDefault()
     if (!communityId) { setError('コミュニティを選択してください'); return }
     setLoading(true)
+    const upsertData = { id: user.id, community_id: communityId, updated_at: new Date().toISOString() }
+    if (displayName) upsertData.display_name = displayName
     const { data, error: dbError } = await supabase
       .from('profiles')
-      .upsert({ id: user.id, display_name: displayName, community_id: communityId, updated_at: new Date().toISOString() })
+      .upsert(upsertData)
       .select()
       .single()
     if (dbError) {
