@@ -749,13 +749,13 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
       )}
 
       {/* Navigation */}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
         {['free', 'pomodoro'].map(m => (
           <button
             key={m}
             onClick={() => { setView('timer'); switchMode(m) }}
             style={{
-              padding: '8px 20px',
+              padding: '8px 14px',
               borderRadius: 20,
               border: 'none',
               cursor: status !== 'idle' && view === 'timer' ? 'not-allowed' : 'pointer',
@@ -772,7 +772,7 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
         <button
           onClick={() => setView('log')}
           style={{
-            padding: '8px 20px',
+            padding: '8px 14px',
             borderRadius: 6,
             border: 'none',
             cursor: 'pointer',
@@ -788,7 +788,7 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
         <button
           onClick={() => setView('settings')}
           style={{
-            padding: '8px 20px',
+            padding: '8px 14px',
             borderRadius: 6,
             border: 'none',
             cursor: 'pointer',
@@ -805,7 +805,7 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
           <button
             onClick={() => setView('admin')}
             style={{
-              padding: '8px 20px',
+              padding: '8px 14px',
               borderRadius: 6,
               border: 'none',
               cursor: 'pointer',
