@@ -493,7 +493,7 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
     if (status === 'running') return
     pendingAlarmRef.current = null
     setAlarmMessage(null)
-    document.title = '研究タイマー'
+    document.title = '研究タイマーα版'
     runStartRef.current = Date.now()
     if (status === 'idle') {
       setSessionStart(new Date())
@@ -569,7 +569,7 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
     setRestored(false)
     pendingAlarmRef.current = null
     setAlarmMessage(null)
-    document.title = '研究タイマー'
+    document.title = '研究タイマーα版'
     setStatus('idle')
     setElapsed(0)
     setPomodoroLeft(POMODORO_WORK)
@@ -629,6 +629,17 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
         audio.currentTime = 0
         audio.play().catch(() => {})
       })
+      // iOS pauses audio unexpectedly when app comes to foreground.
+      // Auto-resume if shouldPlayMusicRef is still true (= not an intentional pause).
+      audio.addEventListener('pause', () => {
+        if (shouldPlayMusicRef.current) {
+          setTimeout(() => {
+            if (shouldPlayMusicRef.current && audio.paused) {
+              audio.play().catch(() => {})
+            }
+          }, 300)
+        }
+      })
       musicRef.current = audio
       musicKeyRef.current = bgMusic
     }
@@ -682,7 +693,7 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: '#222' }}>研究タイマー</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 700, color: '#222' }}>研究タイマーα版</h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ fontSize: 13, color: '#aaa' }}>{profile?.display_name || user.email}</span>
           <button
@@ -892,7 +903,7 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
             onClick={() => {
               pendingAlarmRef.current = null
               setAlarmMessage(null)
-              document.title = '研究タイマー'
+              document.title = '研究タイマーα版'
             }}
             style={{
               padding: '6px 16px',

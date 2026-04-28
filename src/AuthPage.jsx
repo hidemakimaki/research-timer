@@ -86,7 +86,7 @@ export default function AuthPage() {
         maxWidth: 380,
         boxShadow: '0 2px 16px rgba(0,0,0,0.09)',
       }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: '#222', marginBottom: 4 }}>研究タイマー</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 700, color: '#222', marginBottom: 4 }}>研究タイマーα版</h1>
         <p style={{ fontSize: 14, color: '#888', marginBottom: 28 }}>
           {isLogin ? 'ログインして研究記録を同期する' : 'アカウントを作成する'}
         </p>
