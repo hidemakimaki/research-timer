@@ -189,6 +189,7 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
   const pendingAlarmRef = useRef(null) // 'work' | 'break' | null — pending alarm to retry on visibility
   const achievedRef = useRef(null)    // { [dateStr]: Set<'25'|'50'|'100'> } — prevents double-awarding
   const statusRef = useRef('idle')
+  const shouldPlayMusicRef = useRef(false)
 
   // profileがnullのまま表示された場合にバックグラウンドで1回だけ再取得
   useEffect(() => {
@@ -613,6 +614,7 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
   // Background music — plays only during Pomodoro work phase
   useEffect(() => {
     const shouldPlay = status === 'running' && bgMusic !== 'off' && (mode === 'free' || phase === 'work')
+    shouldPlayMusicRef.current = shouldPlay
     if (!shouldPlay) {
       musicRef.current?.pause()
       return
@@ -652,6 +654,10 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
         // runStartRef is still the original value, so tick() computes correct elapsed
         if (statusRef.current === 'running' && !intervalRef.current) {
           intervalRef.current = setInterval(() => tickRef.current(), 1000)
+        }
+        // Resume music if iOS suspended it during standby
+        if (shouldPlayMusicRef.current && musicRef.current?.paused) {
+          musicRef.current.play().catch(() => {})
         }
       }
     }
