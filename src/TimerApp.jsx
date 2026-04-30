@@ -229,6 +229,7 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
   const achievedRef = useRef(null)    // { [dateStr]: Set<'25'|'50'|'100'> } — prevents double-awarding
   const statusRef = useRef('idle')
   const shouldPlayMusicRef = useRef(false)
+  const pendingBreakPianoRef = useRef(false)
 
 
   // profileがnullのまま表示された場合にバックグラウンドで1回だけ再取得
@@ -656,19 +657,15 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
 
   useEffect(() => () => clearInterval_(), [clearInterval_])
 
-  // Background music — ice/fire play during work, piano plays during break too
+  // Background music — plays during work phase (free mode plays always)
   useEffect(() => {
-    const shouldPlay = status === 'running' && bgMusic !== 'off' && (
-      bgMusic === 'piano'
-        ? true  // piano plays during both work and break
-        : (mode === 'free' || phase === 'work')
-    )
+    const shouldPlay = status === 'running' && bgMusic !== 'off' && (mode === 'free' || phase === 'work')
     shouldPlayMusicRef.current = shouldPlay
     if (!shouldPlay) {
       musicRef.current?.pause()
       return
     }
-    const MUSIC_SRC = { ice: '/ice3.m4a', fire: '/fire.mp3', piano: '/piano.mp3' }
+    const MUSIC_SRC = { ice: '/ice3.m4a', fire: '/fire.mp3' }
     if (!musicRef.current || musicKeyRef.current !== bgMusic) {
       musicRef.current?.pause()
       const audio = new Audio(MUSIC_SRC[bgMusic])
@@ -697,6 +694,17 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
 
   useEffect(() => () => { musicRef.current?.pause() }, [])
 
+  // Piano — 休憩開始時に1回再生、スタンバイ中に逃した場合は復帰時にリトライ
+  useEffect(() => {
+    if (!(status === 'running' && mode === 'pomodoro' && phase === 'break')) {
+      pendingBreakPianoRef.current = false
+      return
+    }
+    pendingBreakPianoRef.current = true
+    const a = new Audio('/piano.mp3')
+    a.volume = 0.5
+    a.play().then(() => { pendingBreakPianoRef.current = false }).catch(() => {})
+  }, [status, phase, mode])
 
   useEffect(() => {
     document.body.style.background = milestone?.bg || '#f5f5f5'
@@ -719,6 +727,12 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
         // Resume music if iOS suspended it during standby
         if (shouldPlayMusicRef.current && musicRef.current?.paused) {
           musicRef.current.play().catch(() => {})
+        }
+        // Retry break piano if it failed to play while screen was off
+        if (pendingBreakPianoRef.current) {
+          const a = new Audio('/piano.mp3')
+          a.volume = 0.5
+          a.play().then(() => { pendingBreakPianoRef.current = false }).catch(() => {})
         }
       }
     }
@@ -1039,10 +1053,9 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
 
         <div style={{ display: 'flex', gap: 8 }}>
             {[
-              { key: 'off',   label: 'off'       },
-              { key: 'ice',   label: '❄️ ice'   },
-              { key: 'fire',  label: '🔥 fire'  },
-              { key: 'piano', label: '🎹 piano' },
+              { key: 'off',  label: 'off'      },
+              { key: 'ice',  label: '❄️ ice'  },
+              { key: 'fire', label: '🔥 fire' },
             ].map(({ key, label }) => (
               <button
                 key={key}
