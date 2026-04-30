@@ -53,20 +53,60 @@ const FAVORITE_WORDS = [
   '不正解は無意味を意味しない。',
 ]
 
-// ポモドーロ終了: 2回連続再生
-function playWorkChime() {
-  const a = new Audio('/pomodoro-end.mp3')
-  a.play().catch(() => {})
-  a.addEventListener('ended', () => {
-    const a2 = new Audio('/pomodoro-end.mp3')
-    a2.play().catch(() => {})
+// ─── Web Audio API (Start ボタン押下時に unlock → setInterval からも再生可) ───
+let _audioCtx = null
+
+function getAudioCtx() {
+  if (!_audioCtx || _audioCtx.state === 'closed') {
+    _audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+  }
+  return _audioCtx
+}
+
+// ユーザー操作時に呼び出して AudioContext を解放する
+function ensureAudioUnlocked() {
+  const ctx = getAudioCtx()
+  if (ctx.state === 'suspended') ctx.resume()
+}
+
+const _bufferCache = {}
+
+async function loadBuffer(url) {
+  if (_bufferCache[url]) return _bufferCache[url]
+  const ctx = getAudioCtx()
+  const res = await fetch(url)
+  const arr = await res.arrayBuffer()
+  const buf = await ctx.decodeAudioData(arr)
+  _bufferCache[url] = buf
+  return buf
+}
+
+function playBuffer(buffer) {
+  return new Promise(resolve => {
+    const ctx = getAudioCtx()
+    const src = ctx.createBufferSource()
+    src.buffer = buffer
+    src.connect(ctx.destination)
+    src.onended = resolve
+    src.start()
   })
 }
 
+// ポモドーロ終了: 2回連続再生
+async function playWorkChime() {
+  try {
+    const buf = await loadBuffer('/pomodoro-end.mp3')
+    await playBuffer(buf)
+    await playBuffer(buf)
+  } catch {}
+}
+
 // 休憩終了: 1回再生
-function playBreakChime() {
-  const a = new Audio('/break-end.mp3')
-  a.play().catch(() => {})
+async function playBreakChime() {
+  try {
+    const buf = await loadBuffer('/break-end.mp3')
+    await playBuffer(buf)
+  } catch {}
 }
 
 function loadLocalSessions() {
@@ -491,6 +531,10 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
 
   const start = useCallback(() => {
     if (status === 'running') return
+    // ユーザー操作でAudioContextを解放し、アラーム音をプリロード
+    ensureAudioUnlocked()
+    loadBuffer('/pomodoro-end.mp3').catch(() => {})
+    loadBuffer('/break-end.mp3').catch(() => {})
     pendingAlarmRef.current = null
     setAlarmMessage(null)
     document.title = '研究タイマーα版'
