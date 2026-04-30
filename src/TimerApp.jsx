@@ -230,6 +230,8 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
   const achievedRef = useRef(null)    // { [dateStr]: Set<'25'|'50'|'100'> } — prevents double-awarding
   const statusRef = useRef('idle')
   const shouldPlayMusicRef = useRef(false)
+  const breakMusicRef = useRef(null)
+  const shouldPlayBreakMusicRef = useRef(false)
 
   // profileがnullのまま表示された場合にバックグラウンドで1回だけ再取得
   useEffect(() => {
@@ -692,6 +694,38 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
 
   useEffect(() => () => { musicRef.current?.pause() }, [])
 
+  // Relaxing Piano — ポモドーロ休憩フェーズ中のみ再生
+  useEffect(() => {
+    const shouldPlay = status === 'running' && mode === 'pomodoro' && phase === 'break'
+    shouldPlayBreakMusicRef.current = shouldPlay
+    if (!shouldPlay) {
+      if (breakMusicRef.current) {
+        breakMusicRef.current.pause()
+        breakMusicRef.current.currentTime = 0
+      }
+      return
+    }
+    if (!breakMusicRef.current) {
+      const audio = new Audio('/relaxing-piano.mp3')
+      audio.loop = true
+      audio.volume = 0.5
+      // iOS がフォアグラウンド復帰時に停止した場合の自動再開
+      audio.addEventListener('pause', () => {
+        if (shouldPlayBreakMusicRef.current) {
+          setTimeout(() => {
+            if (shouldPlayBreakMusicRef.current && audio.paused) {
+              audio.play().catch(() => {})
+            }
+          }, 300)
+        }
+      })
+      breakMusicRef.current = audio
+    }
+    breakMusicRef.current.play().catch(() => {})
+  }, [status, phase, mode])
+
+  useEffect(() => () => { breakMusicRef.current?.pause() }, [])
+
   useEffect(() => {
     document.body.style.background = milestone?.bg || '#f5f5f5'
     return () => { document.body.style.background = '' }
@@ -713,6 +747,9 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
         // Resume music if iOS suspended it during standby
         if (shouldPlayMusicRef.current && musicRef.current?.paused) {
           musicRef.current.play().catch(() => {})
+        }
+        if (shouldPlayBreakMusicRef.current && breakMusicRef.current?.paused) {
+          breakMusicRef.current.play().catch(() => {})
         }
       }
     }
