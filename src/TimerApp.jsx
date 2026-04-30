@@ -657,15 +657,19 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
 
   useEffect(() => () => clearInterval_(), [clearInterval_])
 
-  // Background music — plays only during Pomodoro work phase
+  // Background music — ice/fire play during work, piano plays during break too
   useEffect(() => {
-    const shouldPlay = status === 'running' && bgMusic !== 'off' && (mode === 'free' || phase === 'work')
+    const shouldPlay = status === 'running' && bgMusic !== 'off' && (
+      bgMusic === 'piano'
+        ? true  // piano plays during both work and break
+        : (mode === 'free' || phase === 'work')
+    )
     shouldPlayMusicRef.current = shouldPlay
     if (!shouldPlay) {
       musicRef.current?.pause()
       return
     }
-    const MUSIC_SRC = { ice: '/ice3.m4a', fire: '/fire.mp3' }
+    const MUSIC_SRC = { ice: '/ice3.m4a', fire: '/fire.mp3', piano: '/piano.mp3' }
     if (!musicRef.current || musicKeyRef.current !== bgMusic) {
       musicRef.current?.pause()
       const audio = new Audio(MUSIC_SRC[bgMusic])
@@ -1063,9 +1067,10 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
 
         <div style={{ display: 'flex', gap: 8 }}>
             {[
-              { key: 'off',  label: 'off'  },
-              { key: 'ice',  label: '❄️ ice'  },
-              { key: 'fire', label: '🔥 fire' },
+              { key: 'off',   label: 'off'       },
+              { key: 'ice',   label: '❄️ ice'   },
+              { key: 'fire',  label: '🔥 fire'  },
+              { key: 'piano', label: '🎹 piano' },
             ].map(({ key, label }) => (
               <button
                 key={key}
