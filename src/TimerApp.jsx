@@ -497,6 +497,9 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
           playBreakChime()
         }
         if (phase === 'work') {
+          // Stop background music immediately when break starts
+          shouldPlayMusicRef.current = false
+          musicRef.current?.pause()
           // Save completed Pomodoro session immediately
           const start = sessionStartRef.current || new Date()
           supabase.from('sessions').insert({
@@ -672,8 +675,10 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
       audio.loop = true
       audio.volume = 0.4
       audio.addEventListener('ended', () => {
-        audio.currentTime = 0
-        audio.play().catch(() => {})
+        if (shouldPlayMusicRef.current) {
+          audio.currentTime = 0
+          audio.play().catch(() => {})
+        }
       })
       // iOS pauses audio unexpectedly when app comes to foreground.
       // Auto-resume if shouldPlayMusicRef is still true (= not an intentional pause).
