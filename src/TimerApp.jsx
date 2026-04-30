@@ -81,12 +81,15 @@ async function loadBuffer(url) {
   return buf
 }
 
-function playBuffer(buffer) {
+function playBuffer(buffer, volume = 1.0) {
   return new Promise(resolve => {
     const ctx = getAudioCtx()
     const src = ctx.createBufferSource()
     src.buffer = buffer
-    src.connect(ctx.destination)
+    const gain = ctx.createGain()
+    gain.gain.value = volume
+    src.connect(gain)
+    gain.connect(ctx.destination)
     src.onended = resolve
     src.start()
   })
@@ -106,6 +109,12 @@ async function playBreakChime() {
     const buf = await loadBuffer('/break-end.mp3')
     await playBuffer(buf)
   } catch {}
+}
+
+// 休憩開始ピアノ: 1回再生
+async function playBreakPiano() {
+  const buf = await loadBuffer('/piano.mp3')
+  await playBuffer(buf, 0.5)
 }
 
 function loadLocalSessions() {
@@ -709,9 +718,9 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
       return
     }
     pendingBreakPianoRef.current = true
-    const a = new Audio('/piano.mp3')
-    a.volume = 0.5
-    a.play().then(() => { pendingBreakPianoRef.current = false }).catch(() => {})
+    playBreakPiano()
+      .then(() => { pendingBreakPianoRef.current = false })
+      .catch(() => {})
   }, [status, phase, mode])
 
   useEffect(() => {
@@ -738,9 +747,9 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
         }
         // Retry break piano if it failed to play while screen was off
         if (pendingBreakPianoRef.current) {
-          const a = new Audio('/piano.mp3')
-          a.volume = 0.5
-          a.play().then(() => { pendingBreakPianoRef.current = false }).catch(() => {})
+          playBreakPiano()
+            .then(() => { pendingBreakPianoRef.current = false })
+            .catch(() => {})
         }
       }
     }
