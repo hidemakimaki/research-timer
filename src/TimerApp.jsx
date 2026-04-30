@@ -707,18 +707,8 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
     }
     if (!breakMusicRef.current) {
       const audio = new Audio('/relaxing-piano.mp3')
-      audio.loop = true
+      audio.loop = false
       audio.volume = 0.5
-      // iOS がフォアグラウンド復帰時に停止した場合の自動再開
-      audio.addEventListener('pause', () => {
-        if (shouldPlayBreakMusicRef.current) {
-          setTimeout(() => {
-            if (shouldPlayBreakMusicRef.current && audio.paused) {
-              audio.play().catch(() => {})
-            }
-          }, 300)
-        }
-      })
       breakMusicRef.current = audio
     }
     breakMusicRef.current.play().catch(() => {})
@@ -747,9 +737,6 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
         // Resume music if iOS suspended it during standby
         if (shouldPlayMusicRef.current && musicRef.current?.paused) {
           musicRef.current.play().catch(() => {})
-        }
-        if (shouldPlayBreakMusicRef.current && breakMusicRef.current?.paused) {
-          breakMusicRef.current.play().catch(() => {})
         }
       }
     }
