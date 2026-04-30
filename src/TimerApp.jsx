@@ -92,11 +92,10 @@ function playBuffer(buffer) {
   })
 }
 
-// ポモドーロ終了: 2回連続再生
+// ポモドーロ終了: 1回再生
 async function playWorkChime() {
   try {
     const buf = await loadBuffer('/pomodoro-end.mp3')
-    await playBuffer(buf)
     await playBuffer(buf)
   } catch {}
 }
@@ -230,7 +229,7 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
   const achievedRef = useRef(null)    // { [dateStr]: Set<'25'|'50'|'100'> } — prevents double-awarding
   const statusRef = useRef('idle')
   const shouldPlayMusicRef = useRef(false)
-  const breakMusicRef = useRef(null)
+  const breakMusicSrcRef = useRef(null)
   const shouldPlayBreakMusicRef = useRef(false)
 
   // profileがnullのまま表示された場合にバックグラウンドで1回だけ再取得
@@ -537,6 +536,7 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
     ensureAudioUnlocked()
     loadBuffer('/pomodoro-end.mp3').catch(() => {})
     loadBuffer('/break-end.mp3').catch(() => {})
+    loadBuffer('/relaxing-piano.mp3').catch(() => {})
     pendingAlarmRef.current = null
     setAlarmMessage(null)
     document.title = '研究タイマーα版'
@@ -694,27 +694,33 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
 
   useEffect(() => () => { musicRef.current?.pause() }, [])
 
-  // Relaxing Piano — ポモドーロ休憩フェーズ中のみ再生
+  // Relaxing Piano — ポモドーロ休憩フェーズ開始時に1回再生（Web Audio API）
   useEffect(() => {
     const shouldPlay = status === 'running' && mode === 'pomodoro' && phase === 'break'
     shouldPlayBreakMusicRef.current = shouldPlay
     if (!shouldPlay) {
-      if (breakMusicRef.current) {
-        breakMusicRef.current.pause()
-        breakMusicRef.current.currentTime = 0
-      }
+      try { breakMusicSrcRef.current?.stop() } catch {}
+      breakMusicSrcRef.current = null
       return
     }
-    if (!breakMusicRef.current) {
-      const audio = new Audio('/relaxing-piano.mp3')
-      audio.loop = false
-      audio.volume = 0.5
-      breakMusicRef.current = audio
-    }
-    breakMusicRef.current.play().catch(() => {})
+    loadBuffer('/relaxing-piano.mp3').then(buf => {
+      if (!shouldPlayBreakMusicRef.current) return
+      const ctx = getAudioCtx()
+      const gainNode = ctx.createGain()
+      gainNode.gain.value = 0.5
+      gainNode.connect(ctx.destination)
+      const src = ctx.createBufferSource()
+      src.buffer = buf
+      src.connect(gainNode)
+      src.start()
+      breakMusicSrcRef.current = src
+      src.onended = () => { breakMusicSrcRef.current = null }
+    }).catch(() => {})
   }, [status, phase, mode])
 
-  useEffect(() => () => { breakMusicRef.current?.pause() }, [])
+  useEffect(() => () => {
+    try { breakMusicSrcRef.current?.stop() } catch {}
+  }, [])
 
   useEffect(() => {
     document.body.style.background = milestone?.bg || '#f5f5f5'
