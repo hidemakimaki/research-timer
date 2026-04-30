@@ -376,6 +376,9 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
   const isLegendary = todayTotal >= 100 * 60
   const legendaryEmoji = useMemo(() => {
     if (!isLegendary) return ''
+    const todayStr = toDateStr(new Date())
+    const existing = legendaryHistory.find(e => e.date === todayStr)
+    if (existing) return existing.emoji
     const EMOJIS = [
       { e: '🌟', w: 10 },
       { e: '🌍', w: 10 },
@@ -390,7 +393,7 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
       if (r <= 0) return e
     }
     return '🧸'
-  }, [isLegendary])
+  }, [isLegendary, legendaryHistory])
 
   // Record legendary emoji once per day when milestone is first reached
   useEffect(() => {
