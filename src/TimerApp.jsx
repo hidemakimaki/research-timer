@@ -224,6 +224,8 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
   const [view, setView] = useState('timer')
   const [alarmMessage, setAlarmMessage] = useState(null)
   const [restored, setRestored] = useState(false)
+  const [workMin, setWorkMin] = useState(25)
+  const [breakMin, setBreakMin] = useState(5)
 
   const intervalRef = useRef(null)
   const runStartRef = useRef(null)    // Date.now() when current run segment began
@@ -239,6 +241,8 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
   const statusRef = useRef('idle')
   const shouldPlayMusicRef = useRef(false)
   const pendingBreakPianoRef = useRef(false)
+  const pomodoroWorkRef = useRef(POMODORO_WORK)
+  const pomodoroBreakRef = useRef(POMODORO_BREAK)
 
 
   // profileがnullのまま表示された場合にバックグラウンドで1回だけ再取得
@@ -277,6 +281,8 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
   useEffect(() => { fetchSessions() }, [fetchSessions])
   useEffect(() => { sessionStartRef.current = sessionStart }, [sessionStart])
   useEffect(() => { statusRef.current = status }, [status])
+  useEffect(() => { pomodoroWorkRef.current = workMin * 60 }, [workMin])
+  useEffect(() => { pomodoroBreakRef.current = breakMin * 60 }, [breakMin])
 
   // Restore timer state from localStorage on mount (survives page refresh / accidental close)
   useEffect(() => {
@@ -299,7 +305,7 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
       baseElapsedRef.current = restoredElapsed
       setElapsed(restoredElapsed)
     } else {
-      const restoredLeft = Math.max(0, (saved.pomodoroLeft ?? POMODORO_WORK) - timePassed)
+      const restoredLeft = Math.max(0, (saved.pomodoroLeft ?? pomodoroWorkRef.current) - timePassed)
       baseLeftRef.current = restoredLeft
       setPomodoroLeft(restoredLeft)
       setPhase(saved.phase || 'work')
@@ -518,22 +524,22 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
             user_id: userIdRef.current,
             date: toDateStr(start),
             started_at: start.toISOString(),
-            duration: POMODORO_WORK,
+            duration: pomodoroWorkRef.current,
             mode: 'pomodoro',
           }).then(({ error }) => {
             if (!error) fetchSessionsRef.current()
           })
           setPhase('break')
-          setPomodoroLeft(POMODORO_BREAK)
+          setPomodoroLeft(pomodoroBreakRef.current)
           // Auto-start break timer
-          baseLeftRef.current = POMODORO_BREAK
+          baseLeftRef.current = pomodoroBreakRef.current
           runStartRef.current = Date.now()
           setStatus('running')
           intervalRef.current = setInterval(() => tickRef.current(), 1000)
         } else {
           runStartRef.current = null
           setPhase('work')
-          setPomodoroLeft(POMODORO_WORK)
+          setPomodoroLeft(pomodoroWorkRef.current)
           setStatus('idle')
         }
       } else {
@@ -601,7 +607,7 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
     runStartRef.current = null
     const workSeconds = mode === 'free'
       ? finalElapsed
-      : accumulatedWork + (phase === 'work' ? POMODORO_WORK - finalLeft : 0)
+      : accumulatedWork + (phase === 'work' ? pomodoroWorkRef.current - finalLeft : 0)
 
     if (workSeconds > 0) {
       const sessionDate = toDateStr(sessionStart || new Date())
@@ -633,7 +639,7 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
     document.title = '研究タイマーα版'
     setStatus('idle')
     setElapsed(0)
-    setPomodoroLeft(POMODORO_WORK)
+    setPomodoroLeft(pomodoroWorkRef.current)
     setPhase('work')
     setAccumulatedWork(0)
     setSessionStart(null)
@@ -643,7 +649,7 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
     if (status !== 'idle') return
     setMode(newMode)
     setElapsed(0)
-    setPomodoroLeft(POMODORO_WORK)
+    setPomodoroLeft(pomodoroWorkRef.current)
     setPhase('work')
     setAccumulatedWork(0)
   }, [status])
@@ -745,10 +751,8 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
 
   const isPomodoro = mode === 'pomodoro'
   const displayTime = isPomodoro ? pomodoroLeft : elapsed
-  const progress = isPomodoro
-    ? ((phase === 'work' ? POMODORO_WORK : POMODORO_BREAK) - pomodoroLeft) /
-      (phase === 'work' ? POMODORO_WORK : POMODORO_BREAK)
-    : 0
+  const pomodoroTotal = phase === 'work' ? pomodoroWorkRef.current : pomodoroBreakRef.current
+  const progress = isPomodoro ? (pomodoroTotal - pomodoroLeft) / pomodoroTotal : 0
 
   const phaseColor = phase === 'work' ? '#4f7cff' : '#34c97e'
   const phaseLabel = phase === 'work' ? '作業中' : '休憩中'
@@ -1079,6 +1083,33 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
               </button>
             ))}
           </div>
+
+        {isPomodoro && status === 'idle' && (
+          <div style={{ display: 'flex', gap: 16, alignItems: 'center', fontSize: 13, color: '#999' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              作業
+              <input
+                type="number" min={1} max={90} value={workMin}
+                onChange={e => {
+                  const v = Math.max(1, Math.min(90, Number(e.target.value)))
+                  setWorkMin(v)
+                  setPomodoroLeft(v * 60)
+                }}
+                style={{ width: 44, textAlign: 'center', border: '1.5px solid #e0e0e0', borderRadius: 6, padding: '3px 6px', fontSize: 13 }}
+              />
+              分
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              休憩
+              <input
+                type="number" min={1} max={30} value={breakMin}
+                onChange={e => setBreakMin(Math.max(1, Math.min(30, Number(e.target.value))))}
+                style={{ width: 44, textAlign: 'center', border: '1.5px solid #e0e0e0', borderRadius: 6, padding: '3px 6px', fontSize: 13 }}
+              />
+              分
+            </label>
+          </div>
+        )}
       </div>
 
       {/* Today's Total */}
