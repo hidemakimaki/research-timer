@@ -672,9 +672,9 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
 
   useEffect(() => () => clearInterval_(), [clearInterval_])
 
-  // Background music — plays during work phase (free mode plays always)
+  // Background music — plays while timer is running (work and break phases)
   useEffect(() => {
-    const shouldPlay = status === 'running' && bgMusic !== 'off' && (mode === 'free' || phase === 'work')
+    const shouldPlay = status === 'running' && bgMusic !== 'off'
     shouldPlayMusicRef.current = shouldPlay
     if (!shouldPlay) {
       musicRef.current?.pause()
@@ -686,28 +686,14 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
       const audio = new Audio(MUSIC_SRC[bgMusic])
       audio.loop = true
       audio.volume = 0.4
-      audio.addEventListener('ended', () => {
-        if (shouldPlayMusicRef.current) {
-          audio.currentTime = 0
-          audio.play().catch(() => {})
-        }
-      })
-      // iOS pauses audio unexpectedly when app comes to foreground.
-      // Auto-resume if shouldPlayMusicRef is still true (= not an intentional pause).
-      audio.addEventListener('pause', () => {
-        if (shouldPlayMusicRef.current) {
-          setTimeout(() => {
-            if (shouldPlayMusicRef.current && audio.paused) {
-              audio.play().catch(() => {})
-            }
-          }, 300)
-        }
-      })
       musicRef.current = audio
       musicKeyRef.current = bgMusic
     }
-    musicRef.current.play().catch(() => {})
-  }, [status, phase, mode, bgMusic])
+    // Guard: skip if already playing to avoid iOS restarting from beginning
+    if (musicRef.current.paused) {
+      musicRef.current.play().catch(() => {})
+    }
+  }, [status, bgMusic])
 
   useEffect(() => () => { musicRef.current?.pause() }, [])
 
