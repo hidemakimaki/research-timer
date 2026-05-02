@@ -111,10 +111,29 @@ async function playBreakChime() {
   } catch {}
 }
 
-// 休憩開始ピアノ: 1回再生
+// 再生中のピアノノードを追跡（スタンバイ復帰時の重複再生を防ぐ）
+let _breakPianoNode = null
+
+// 休憩開始ピアノ: 再生中は新規ノードを作らない
 async function playBreakPiano() {
-  const buf = await loadBuffer('/piano.mp3')
-  await playBuffer(buf, 0.5)
+  if (_breakPianoNode) return
+  try {
+    const buf = await loadBuffer('/piano.mp3')
+    const ctx = getAudioCtx()
+    const src = ctx.createBufferSource()
+    src.buffer = buf
+    const gain = ctx.createGain()
+    gain.gain.value = 0.5
+    src.connect(gain)
+    gain.connect(ctx.destination)
+    await new Promise(resolve => {
+      src.onended = () => { _breakPianoNode = null; resolve() }
+      src.start()
+      _breakPianoNode = src
+    })
+  } catch {
+    _breakPianoNode = null
+  }
 }
 
 function loadLocalSessions() {
@@ -724,12 +743,13 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
+        // AudioContextを再開（停止中のピアノノードも再開される）
+        ensureAudioUnlocked()
         // Replay alarm if it fired while page was hidden/audio was suspended
         if (pendingAlarmRef.current === 'work') playWorkChime()
         else if (pendingAlarmRef.current === 'break') playBreakChime()
         tickRef.current()
         // Restart interval if iOS suspended and killed it while timer was running
-        // runStartRef is still the original value, so tick() computes correct elapsed
         if (statusRef.current === 'running' && !intervalRef.current) {
           intervalRef.current = setInterval(() => tickRef.current(), 1000)
         }
@@ -737,7 +757,8 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
         if (shouldPlayMusicRef.current && musicRef.current?.paused) {
           musicRef.current.play().catch(() => {})
         }
-        // Retry break piano if it failed to play while screen was off
+        // _breakPianoNodeが存在 → ensureAudioUnlockedで再開済み（no-op）
+        // 存在しない → 未再生のため新規開始
         if (pendingBreakPianoRef.current) {
           playBreakPiano()
             .then(() => { pendingBreakPianoRef.current = false })
