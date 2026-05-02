@@ -111,6 +111,11 @@ async function playBreakChime() {
   } catch {}
 }
 
+function sendNotification(title, body) {
+  if (Notification?.permission !== 'granted') return
+  try { new Notification(title, { body }) } catch {}
+}
+
 // 再生中のピアノノードを追跡（スタンバイ復帰時の重複再生を防ぐ）
 let _breakPianoNode = null
 
@@ -527,11 +532,13 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
           setAlarmMessage('⏰ 作業終了！ 休憩に入りましょう')
           document.title = '⏰ ポモドーロ終了！'
           playWorkChime()
+          sendNotification('⏰ 作業終了！', '休憩に入りましょう')
         } else {
           pendingAlarmRef.current = 'break'
           setAlarmMessage('⏰ 休憩終了！ 次のポモドーロを始めましょう')
           document.title = '⏰ 休憩終了！'
           playBreakChime()
+          sendNotification('⏰ 休憩終了！', '次のポモドーロを始めましょう')
         }
         if (phase === 'work') {
           // Stop background music immediately when break starts
@@ -572,6 +579,8 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
 
   const start = useCallback(() => {
     if (status === 'running') return
+    // 通知許可リクエスト（初回のみダイアログ表示）
+    if (Notification?.permission === 'default') Notification.requestPermission()
     // ユーザー操作でAudioContextを解放し、アラーム音をプリロード
     ensureAudioUnlocked()
     loadBuffer('/pomodoro-end.mp3').catch(() => {})
