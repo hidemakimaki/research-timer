@@ -116,28 +116,73 @@ function sendNotification(title, body) {
   try { new Notification(title, { body }) } catch {}
 }
 
-// 再生中のピアノノードを追跡（スタンバイ復帰時の重複再生を防ぐ）
-let _breakPianoNode = null
+// ─── 休憩ピアノ ───
+// HTMLAudioElement で再生する（Web Audio と違い、タブが隠れても・他の画面に
+// 切り替えても AudioContext の suspend で止まらない。ice/fire と同じ方式）
+// 要素はシングルトンなので、重複再生も構造的に起こらない
+let _pianoAudio = null
+let _pianoShouldPlay = false
 
-// 休憩開始ピアノ: 再生中は新規ノードを作らない
-async function playBreakPiano() {
-  if (_breakPianoNode) return
-  try {
-    const buf = await loadBuffer('/piano.mp3')
-    const ctx = getAudioCtx()
-    const src = ctx.createBufferSource()
-    src.buffer = buf
-    const gain = ctx.createGain()
-    gain.gain.value = 0.5
-    src.connect(gain)
-    gain.connect(ctx.destination)
-    await new Promise(resolve => {
-      src.onended = () => { _breakPianoNode = null; resolve() }
-      src.start()
-      _breakPianoNode = src
+function getPianoAudio() {
+  if (_pianoAudio) return _pianoAudio
+  const audio = new Audio('/piano.mp3')
+  audio.preload = 'auto'
+  audio.volume = 0.5
+  // iOS はフォアグラウンド復帰時などに勝手に pause することがあるので自動再開
+  audio.addEventListener('pause', () => {
+    if (!_pianoShouldPlay || audio.ended) return
+    setTimeout(() => {
+      if (_pianoShouldPlay && audio.paused && !audio.ended) {
+        audio.play().catch(() => {})
+      }
+    }, 300)
+  })
+  audio.addEventListener('ended', () => { _pianoShouldPlay = false })
+  _pianoAudio = audio
+  return audio
+}
+
+// ユーザー操作中に一度だけ無音で play/pause して iOS の自動再生制限を解除する
+// （休憩開始はユーザー操作から離れたタイミングなので、これがないと弾かれる）
+function unlockPianoAudio() {
+  const audio = getPianoAudio()
+  if (!audio.paused || _pianoShouldPlay) return
+  audio.muted = true
+  audio.play()
+    .then(() => {
+      audio.pause()
+      try { audio.currentTime = 0 } catch {}
+      audio.muted = false
     })
-  } catch {
-    _breakPianoNode = null
+    .catch(() => { audio.muted = false })
+}
+
+function playBreakPiano({ restart = false } = {}) {
+  const audio = getPianoAudio()
+  // 最後まで鳴り終わっている休憩の続き → 頭から鳴らし直さない
+  if (!restart && audio.ended) return
+  _pianoShouldPlay = true
+  audio.muted = false
+  if (restart) { try { audio.currentTime = 0 } catch {} }
+  audio.play().catch(() => {})
+}
+
+// 一時停止: 再生位置は保つ
+function pauseBreakPiano() {
+  _pianoShouldPlay = false
+  _pianoAudio?.pause()
+}
+
+// 停止: 頭出しまで戻す
+function stopBreakPiano() {
+  pauseBreakPiano()
+  if (_pianoAudio) { try { _pianoAudio.currentTime = 0 } catch {} }
+}
+
+// スタンバイ復帰時など、鳴り続けるべきなのに止まっていたら再開する
+function resumeBreakPianoIfNeeded() {
+  if (_pianoShouldPlay && _pianoAudio?.paused && !_pianoAudio.ended) {
+    _pianoAudio.play().catch(() => {})
   }
 }
 
@@ -264,7 +309,7 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
   const achievedRef = useRef(null)    // { [dateStr]: Set<'25'|'50'|'100'> } — prevents double-awarding
   const statusRef = useRef('idle')
   const shouldPlayMusicRef = useRef(false)
-  const pendingBreakPianoRef = useRef(false)
+  const pianoActiveRef = useRef(false)
   const pomodoroWorkRef = useRef(POMODORO_WORK)
   const pomodoroBreakRef = useRef(POMODORO_BREAK)
 
@@ -585,7 +630,7 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
     ensureAudioUnlocked()
     loadBuffer('/pomodoro-end.mp3').catch(() => {})
     loadBuffer('/break-end.mp3').catch(() => {})
-    loadBuffer('/piano.mp3').catch(() => {})
+    unlockPianoAudio()
     pendingAlarmRef.current = null
     setAlarmMessage(null)
     document.title = '研究タイマーα版'
@@ -731,17 +776,29 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
 
   useEffect(() => () => { musicRef.current?.pause() }, [])
 
-  // Piano — 休憩開始時に1回再生、スタンバイ中に逃した場合は復帰時にリトライ
+  // Piano — 休憩中は再生を維持（画面遷移・バックグラウンドでも止めない）
   useEffect(() => {
-    if (!(status === 'running' && mode === 'pomodoro' && phase === 'break')) {
-      pendingBreakPianoRef.current = false
+    if (!(mode === 'pomodoro' && phase === 'break')) {
+      // 休憩が終わった／作業に戻った → 停止して頭出し
+      pianoActiveRef.current = false
+      stopBreakPiano()
       return
     }
-    pendingBreakPianoRef.current = true
-    playBreakPiano()
-      .then(() => { pendingBreakPianoRef.current = false })
-      .catch(() => {})
+    if (status !== 'running') {
+      // タイマー一時停止中は再生位置を保ったまま止める
+      pauseBreakPiano()
+      return
+    }
+    if (pianoActiveRef.current) {
+      // 同じ休憩の途中（再開・再レンダー）→ 頭出しせず続きから
+      playBreakPiano()
+    } else {
+      pianoActiveRef.current = true
+      playBreakPiano({ restart: true })
+    }
   }, [status, phase, mode])
+
+  useEffect(() => () => stopBreakPiano(), [])
 
   useEffect(() => {
     document.body.style.background = milestone?.bg || '#f5f5f5'
@@ -766,13 +823,8 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
         if (shouldPlayMusicRef.current && musicRef.current?.paused) {
           musicRef.current.play().catch(() => {})
         }
-        // _breakPianoNodeが存在 → ensureAudioUnlockedで再開済み（no-op）
-        // 存在しない → 未再生のため新規開始
-        if (pendingBreakPianoRef.current) {
-          playBreakPiano()
-            .then(() => { pendingBreakPianoRef.current = false })
-            .catch(() => {})
-        }
+        // Resume break piano if it was suspended while the screen was off
+        resumeBreakPianoIfNeeded()
       }
     }
     document.addEventListener('visibilitychange', handleVisibility)
