@@ -142,19 +142,19 @@ function getPianoAudio() {
   return audio
 }
 
-// ユーザー操作中に一度だけ無音で play/pause して iOS の自動再生制限を解除する
+// ユーザー操作中に一度 play/pause して iOS の自動再生制限を解除する
 // （休憩開始はユーザー操作から離れたタイミングなので、これがないと弾かれる）
+// muted のまま再生しても iOS は「常に許可」扱いにするだけで非 muted 再生の
+// 許可は下りない。必ず muted を外した状態で play() を呼ぶこと。
+// pause() は同期的に呼ぶので実際には音は出ない（play() の promise は reject
+// されることがあるが、要素のアンロック自体は play() 呼び出し時点で成立する）
 function unlockPianoAudio() {
   const audio = getPianoAudio()
   if (!audio.paused || _pianoShouldPlay) return
-  audio.muted = true
-  audio.play()
-    .then(() => {
-      audio.pause()
-      try { audio.currentTime = 0 } catch {}
-      audio.muted = false
-    })
-    .catch(() => { audio.muted = false })
+  audio.muted = false
+  audio.play()?.catch(() => {})
+  audio.pause()
+  try { audio.currentTime = 0 } catch {}
 }
 
 function playBreakPiano({ restart = false } = {}) {
@@ -179,7 +179,7 @@ function stopBreakPiano() {
   if (_pianoAudio) { try { _pianoAudio.currentTime = 0 } catch {} }
 }
 
-// スタンバイ復帰時など、鳴り続けるべきなのに止まっていたら再開する
+// スタンバイ復帰時・ユーザー操作時など、鳴り続けるべきなのに止まっていたら再開する
 function resumeBreakPianoIfNeeded() {
   if (_pianoShouldPlay && _pianoAudio?.paused && !_pianoAudio.ended) {
     _pianoAudio.play().catch(() => {})
@@ -799,6 +799,17 @@ export default function TimerApp({ user, profile, isAdmin = false, onProfileChan
   }, [status, phase, mode])
 
   useEffect(() => () => stopBreakPiano(), [])
+
+  // 休憩開始時の自動再生がブラウザに弾かれた場合、次のユーザー操作で鳴らし直す
+  useEffect(() => {
+    const retry = () => resumeBreakPianoIfNeeded()
+    document.addEventListener('pointerdown', retry)
+    document.addEventListener('keydown', retry)
+    return () => {
+      document.removeEventListener('pointerdown', retry)
+      document.removeEventListener('keydown', retry)
+    }
+  }, [])
 
   useEffect(() => {
     document.body.style.background = milestone?.bg || '#f5f5f5'
