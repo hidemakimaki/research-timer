@@ -122,12 +122,21 @@ function sendNotification(title, body) {
 // 要素はシングルトンなので、重複再生も構造的に起こらない
 let _pianoAudio = null
 let _pianoShouldPlay = false
+let _pianoUnlocked = false
 
 function getPianoAudio() {
   if (_pianoAudio) return _pianoAudio
   const audio = new Audio('/piano.mp3')
   audio.preload = 'auto'
   audio.volume = 0.5
+  // 鳴ってよいのは _pianoShouldPlay が true のときだけ。アンロック用の play() や
+  // ブラウザ都合の再生再開が漏れても、ここで必ず止める（音は出ない）
+  audio.addEventListener('play', () => {
+    _pianoUnlocked = true
+    if (_pianoShouldPlay) return
+    audio.pause()
+    try { audio.currentTime = 0 } catch {}
+  })
   // iOS はフォアグラウンド復帰時などに勝手に pause することがあるので自動再開
   audio.addEventListener('pause', () => {
     if (!_pianoShouldPlay || audio.ended) return
@@ -146,11 +155,11 @@ function getPianoAudio() {
 // （休憩開始はユーザー操作から離れたタイミングなので、これがないと弾かれる）
 // muted のまま再生しても iOS は「常に許可」扱いにするだけで非 muted 再生の
 // 許可は下りない。必ず muted を外した状態で play() を呼ぶこと。
-// pause() は同期的に呼ぶので実際には音は出ない（play() の promise は reject
-// されることがあるが、要素のアンロック自体は play() 呼び出し時点で成立する）
+// 実際に音が出ないことは同期 pause() ではなく上の 'play' ハンドラが保証する
+// （Safari では同期 pause() が負けて再生が始まってしまうことがある）
 function unlockPianoAudio() {
+  if (_pianoUnlocked || _pianoShouldPlay) return
   const audio = getPianoAudio()
-  if (!audio.paused || _pianoShouldPlay) return
   audio.muted = false
   audio.play()?.catch(() => {})
   audio.pause()
